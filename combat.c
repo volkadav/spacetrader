@@ -1,0 +1,143 @@
+#include "combat.h"
+
+#include <ncurses.h>
+
+#include "player.h"
+#include "util.h"
+
+const enemy_t ENEMIES[ENEMY_COUNT] = {
+    [ENEMY_FERAL_DOG] = {"Feral Dog", 4, 0, 1, 10, 25, false, 8, 20},
+    [ENEMY_WILD_BOAR] = {"Wild Boar", 8, 1, 3, 20, 0, false, 15, 30},
+    [ENEMY_GIANT_SERPENT] = {"Giant Serpent", 12, 0, 2, 20, 10, true, 20, 45},
+    [ENEMY_ROCK_CAT] = {"Rock Cat", 10, 1, 3, 15, 20, false, 20, 40},
+    [ENEMY_MUGGER] = {"Mugger", 6, 0, 2, 0, 40, false, 10, 30},
+    [ENEMY_BANDIT] = {"Bandit", 8, 1, 4, 10, 30, false, 20, 50},
+    [ENEMY_BANDIT_LEADER] = {"Bandit Leader", 12, 2, 6, 15, 10, false, 60, 120},
+    [ENEMY_BAR_BRAWLER] = {"Bar Brawler", 8, 0, 1, 0, 25, false, 10, 50}
+};
+
+static void draw_combat_screen(const game_t *game, const enemy_t *enemy, int enemy_hp, const char *title) {
+    clear();
+    mvprintw(1, 2, "%s", title);
+    mvprintw(3, 2, "You:    HP %d/%d  Weapon: %s  Armor: %s",
+             game->player.hp,
+             game->player.max_hp,
+             WEAPONS[game->player.weapon].name,
+             ARMORS[game->player.armor].name);
+    mvprintw(4, 2, "Enemy:  %s  HP %d/%d  DR %d",
+             enemy->name,
+             enemy_hp,
+             enemy->max_hp,
+             enemy->dr);
+    mvprintw(6, 2, "[A]ttack  [D]efend  [B]andage  [M]edkit  [F]lee  [I]ntimidate");
+    if (game->poison_turns > 0) {
+        mvprintw(8, 2, "Poisoned: %d turns remaining", game->poison_turns);
+    }
+    mvprintw(10, 2, "Last log:");
+    for (int i = 0; i < game->log.count && i < 5; ++i) {
+        int index = (game->log.head - game->log.count + i + NEWS_TICKER_LINES) % NEWS_TICKER_LINES;
+        mvprintw(11 + i, 4, "%s", game->log.text[index]);
+    }
+    refresh();
+}
+
+combat_result_t combat_run(game_t *game, enemy_id_t enemy_id, const char *title) {
+    const enemy_t *enemy = &ENEMIES[enemy_id];
+    int enemy_hp = enemy->max_hp;
+    bool defending = false;
+
+    while (game->player.hp > 0 && enemy_hp > 0) {
+        int ch;
+
+        if (game->poison_turns > 0) {
+            game->poison_turns--;
+            game->player.hp--;
+            game_log(game, "Poison bites for 1 HP.");
+            if (game->player.hp <= 0) {
+                break;
+            }
+        }
+
+        draw_combat_screen(game, enemy, enemy_hp, title);
+        ch = getch();
+
+        switch (ch) {
+        case 'a':
+        case 'A': {
+            int damage = clamp_int(player_weapon_damage(&game->player) + rng_range(game, -1, 1) - enemy->dr, 0, 99);
+            enemy_hp -= damage;
+            game_log(game, "You hit %s for %d HP.", enemy->name, damage);
+            break;
+        }
+        case 'd':
+        case 'D':
+            defending = true;
+            game_log(game, "You brace for the next hit.");
+            break;
+        case 'b':
+        case 'B':
+            if (!player_use_bandage(game)) {
+                continue;
+            }
+            break;
+        case 'm':
+        case 'M':
+            if (!player_use_medkit(game)) {
+                continue;
+            }
+            break;
+        case 'f':
+        case 'F': {
+            int chance = clamp_int(50 - enemy->flee_penalty - player_flee_penalty(&game->player), 10, 90);
+            if (rng_chance(game, chance)) {
+                game_log(game, "You break contact with %s.", enemy->name);
+                return COMBAT_RESULT_ESCAPED;
+            }
+            game->player.hp--;
+            game_log(game, "You fail to flee and take 1 HP while scrambling away.");
+            break;
+        }
+        case 'i':
+        case 'I': {
+            int morale = 15 + (game->player.reputation * 10);
+            bool likely = enemy->flees_at_pct > 0 && (enemy_hp * 100) <= (enemy->max_hp * enemy->flees_at_pct);
+            if (rng_chance(game, likely ? morale + 20 : morale)) {
+                game_log(game, "%s loses nerve and backs off.", enemy->name);
+                return COMBAT_RESULT_ESCAPED;
+            }
+            game_log(game, "%s is not impressed.", enemy->name);
+            break;
+        }
+        default:
+            continue;
+        }
+
+        if (enemy_hp <= 0) {
+            break;
+        }
+
+        {
+            int armor = player_armor_dr(&game->player) + (defending ? 2 : 0);
+            int damage = clamp_int(enemy->damage + rng_range(game, -1, 1) - armor, 0, 99);
+            defending = false;
+            game->player.hp -= damage;
+            game_log(game, "%s hits you for %d HP.", enemy->name, damage);
+            if (enemy->poisonous && damage > 0 && rng_chance(game, 50)) {
+                game->poison_turns = clamp_int(game->poison_turns + 3, 0, 6);
+                game_log(game, "Poison burns into the wound.");
+            }
+        }
+    }
+
+    if (game->player.hp <= 0) {
+        game_set_game_over(game, "You died in a fight on Kepler's Reach.");
+        return COMBAT_RESULT_LOST;
+    }
+
+    {
+        int payout = rng_range(game, enemy->bounty_min, enemy->bounty_max);
+        game->player.credits += payout;
+        game_log(game, "%s is down. You recover %d cr from the scene.", enemy->name, payout);
+    }
+    return COMBAT_RESULT_WON;
+}
