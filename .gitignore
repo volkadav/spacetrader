@@ -1,4 +1,8 @@
 # ---> C
+
+# executable name
+spacetrader
+
 # Prerequisites
 *.d
 
