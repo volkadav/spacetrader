@@ -7,13 +7,16 @@
 #include "market.h"
 #include "util.h"
 
-#define SAVE_MAGIC 0x53545244u
+#define SAVE_MAGIC 0x53504143u
 #define SAVE_VERSION 1u
 #define SCORE_MAGIC 0x53545253u
+#define SAVE_FILENAME ".spacetrader.sav"
+#define SCORE_FILENAME ".spacetrader.scores"
 
 typedef struct {
     uint32_t magic;
-    uint32_t version;
+    uint16_t version;
+    uint16_t reserved;
     uint32_t checksum;
     game_t game;
 } save_blob_t;
@@ -26,8 +29,20 @@ typedef struct {
 } score_blob_t;
 
 static int score_value(const game_t *game) {
-    return game->player.credits + market_estimate_cargo_value(game) + (game->player.reputation * 250) +
-           (game->player_won ? 5000 : 0);
+    return game->player.credits + market_estimate_cargo_value(game) + (game->turn * 10);
+}
+
+static bool append_suffix(const char *path, const char *suffix, char *buffer, size_t buffer_size) {
+    return snprintf(buffer, buffer_size, "%s%s", path, suffix) < (int)buffer_size;
+}
+
+static bool archive_corrupt_save(const char *save_path, char *backup_path, size_t backup_path_size) {
+    if (!append_suffix(save_path, ".bak", backup_path, backup_path_size)) {
+        return false;
+    }
+
+    remove(backup_path);
+    return rename(save_path, backup_path) == 0;
 }
 
 bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size) {
@@ -35,7 +50,7 @@ bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size)
     FILE *fp;
     save_blob_t blob;
 
-    if (!home_file_path(".spacetrader-save.bin", path, sizeof(path))) {
+    if (!home_file_path(SAVE_FILENAME, path, sizeof(path))) {
         snprintf(error_buffer, error_buffer_size, "Could not determine save path.");
         return false;
     }
@@ -61,39 +76,56 @@ bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size)
     return true;
 }
 
-bool load_game(game_t *game, char *error_buffer, size_t error_buffer_size) {
+save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buffer_size) {
     char path[512];
+    char backup_path[540];
     FILE *fp;
     save_blob_t blob;
+    bool archived;
 
-    if (!home_file_path(".spacetrader-save.bin", path, sizeof(path))) {
+    if (!home_file_path(SAVE_FILENAME, path, sizeof(path))) {
         snprintf(error_buffer, error_buffer_size, "Could not determine save path.");
-        return false;
+        return SAVE_LOAD_ERROR;
     }
     fp = fopen(path, "rb");
     if (fp == NULL) {
         snprintf(error_buffer, error_buffer_size, "No save file found.");
-        return false;
+        return SAVE_LOAD_NOT_FOUND;
     }
     if (fread(&blob, sizeof(blob), 1, fp) != 1) {
         fclose(fp);
-        snprintf(error_buffer, error_buffer_size, "Save file is unreadable.");
-        return false;
+        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
+        if (archived) {
+            snprintf(error_buffer, error_buffer_size, "Save is unreadable and was moved to %s.", backup_path);
+        } else {
+            snprintf(error_buffer, error_buffer_size, "Save is unreadable and could not be archived.");
+        }
+        return SAVE_LOAD_CORRUPT;
     }
     fclose(fp);
 
-    if (blob.magic != SAVE_MAGIC || blob.version != SAVE_VERSION) {
-        snprintf(error_buffer, error_buffer_size, "Save file version mismatch.");
-        return false;
+    if (blob.magic != SAVE_MAGIC || blob.version != (uint16_t)SAVE_VERSION) {
+        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
+        if (archived) {
+            snprintf(error_buffer, error_buffer_size, "Save version mismatch; moved to %s.", backup_path);
+        } else {
+            snprintf(error_buffer, error_buffer_size, "Save version mismatch and could not be archived.");
+        }
+        return SAVE_LOAD_CORRUPT;
     }
     if (blob.checksum != crc32_bytes(&blob.game, sizeof(blob.game))) {
-        snprintf(error_buffer, error_buffer_size, "Save file checksum failed.");
-        return false;
+        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
+        if (archived) {
+            snprintf(error_buffer, error_buffer_size, "Save checksum failed; moved to %s.", backup_path);
+        } else {
+            snprintf(error_buffer, error_buffer_size, "Save checksum failed and could not be archived.");
+        }
+        return SAVE_LOAD_CORRUPT;
     }
 
     *game = blob.game;
     game->running = true;
-    return true;
+    return SAVE_LOAD_OK;
 }
 
 void load_high_scores(game_t *game) {
@@ -101,7 +133,7 @@ void load_high_scores(game_t *game) {
     FILE *fp;
     score_blob_t blob;
 
-    if (!home_file_path(".spacetrader-scores.bin", path, sizeof(path))) {
+    if (!home_file_path(SCORE_FILENAME, path, sizeof(path))) {
         return;
     }
 
@@ -160,7 +192,7 @@ void record_high_score(game_t *game, const char *outcome) {
         game->scores[insert_at] = entry;
     }
 
-    if (!home_file_path(".spacetrader-scores.bin", path, sizeof(path))) {
+    if (!home_file_path(SCORE_FILENAME, path, sizeof(path))) {
         game->score_recorded = true;
         return;
     }

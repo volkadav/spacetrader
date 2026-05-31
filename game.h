@@ -99,8 +99,15 @@ typedef struct {
     int quantity;
 } cargo_stack_t;
 
+typedef enum {
+    DROP_KIND_NONE = 0,
+    DROP_KIND_COMMODITY,
+    DROP_KIND_CART
+} drop_kind_t;
+
 typedef struct {
     bool occupied;
+    drop_kind_t kind;
     commodity_id_t commodity;
     int quantity;
     int age;
@@ -147,6 +154,7 @@ typedef struct {
     bool has_lucky_charm;
     bool has_mule;
     bool has_cart;
+    bool owns_cart;
     bool has_hover;
     cargo_stack_t cargo[MAX_CARGO_STACKS];
     int cargo_count;

@@ -11,7 +11,9 @@ void world_rest(game_t *game);
 bool world_pay_impound(game_t *game);
 void world_decay_drops(game_t *game);
 bool world_drop_commodity(game_t *game, location_id_t location, commodity_id_t commodity, int quantity);
+bool world_drop_cart(game_t *game, location_id_t location);
 bool world_pickup_drop(game_t *game, location_id_t location, int slot_index);
 int world_visible_drop_count(const game_t *game, location_id_t location);
+void world_handle_mule_death(game_t *game);
 
 #endif

@@ -224,7 +224,7 @@ bool player_owns_shop_item(const player_t *player, shop_item_id_t item) {
     case SHOP_ITEM_MULE:
         return player->has_mule;
     case SHOP_ITEM_CART:
-        return player->has_cart;
+        return player->owns_cart;
     case SHOP_ITEM_CARGO_HOVER:
         return player->has_hover;
     case SHOP_ITEM_KNIFE:
@@ -293,6 +293,7 @@ bool player_buy_shop_item(game_t *game, shop_item_id_t item) {
         game->player.has_mule = true;
         break;
     case SHOP_ITEM_CART:
+        game->player.owns_cart = true;
         game->player.has_cart = true;
         break;
     case SHOP_ITEM_CARGO_HOVER:

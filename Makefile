@@ -6,7 +6,7 @@ ifeq ($(strip $(NCURSES_LIBS)),)
 NCURSES_LIBS := -lncurses
 endif
 
-SRC := main.c util.c world.c player.c market.c combat.c encounter.c prospect.c save.c ui.c
+SRC := main.c util.c world.c player.c market.c combat.c encounter.c prospect.c gamble.c save.c ui.c
 OBJ := $(SRC:.c=.o)
 
 all: spacetrader

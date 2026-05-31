@@ -1239,4 +1239,22 @@ make clean    # remove build artifacts
 
 ---
 
+## TODO
+
+Implementation gaps to close against this design:
+
+- [ ] Add a full mission loop (job generation, accept/decline, progress tracking, and rewards/fail states).
+- [x] Implement bar gambling mini-games (blackjack/roulette) with proper bet controls.
+- [ ] Expand encounter flow to include richer non-combat branches (including surrender) across road and wilderness events.
+- [x] Implement mule/cart damage semantics from spec (mule-first-hit behavior, cart break/spill handling, and recovery outcomes).
+- [ ] Expand combat command set/behaviors to match design details (including surrender and ally/mule interactions if equipped).
+- [x] Align save/high-score behavior with spec details: primary file naming/location, corrupt-save backup/rename flow, and score formula parity.
+- [ ] Add context-sensitive help overlay on `?` in all major contexts.
+- [ ] Support quantity/bet controls per spec in relevant menus (`+`/`−`, `0–9` quick entry where applicable).
+- [x] Add terminal resize handling (`SIGWINCH`) and redraw-safe layout updates.
+- [x] Refine end-state presentation to match the richer victory/death flow described in this document.
+- [ ] Continue refactoring toward the planned module/state-table architecture for encounters, missions, and gambling systems.
+
+---
+
 *End of Design Document — v0.1*

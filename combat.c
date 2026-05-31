@@ -4,6 +4,7 @@
 
 #include "player.h"
 #include "util.h"
+#include "world.h"
 
 const enemy_t ENEMIES[ENEMY_COUNT] = {
     [ENEMY_FERAL_DOG] = {"Feral Dog", 4, 0, 1, 10, 25, false, 8, 20},
@@ -16,7 +17,12 @@ const enemy_t ENEMIES[ENEMY_COUNT] = {
     [ENEMY_BAR_BRAWLER] = {"Bar Brawler", 8, 0, 1, 0, 25, false, 10, 50}
 };
 
-static void draw_combat_screen(const game_t *game, const enemy_t *enemy, int enemy_hp, const char *title) {
+static void draw_combat_screen(const game_t *game,
+                               const enemy_t *enemy,
+                               int enemy_hp,
+                               int mule_hp,
+                               bool mule_has_cart,
+                               const char *title) {
     clear();
     mvprintw(1, 2, "%s", title);
     mvprintw(3, 2, "You:    HP %d/%d  Weapon: %s  Armor: %s",
@@ -29,14 +35,27 @@ static void draw_combat_screen(const game_t *game, const enemy_t *enemy, int ene
              enemy_hp,
              enemy->max_hp,
              enemy->dr);
-    mvprintw(6, 2, "[A]ttack  [D]efend  [B]andage  [M]edkit  [F]lee  [I]ntimidate");
-    if (game->poison_turns > 0) {
-        mvprintw(8, 2, "Poisoned: %d turns remaining", game->poison_turns);
+    if (mule_hp > 0) {
+        mvprintw(5,
+                 2,
+                 "Mule:   HP %d/8  Attack: %s",
+                 mule_hp,
+                 mule_has_cart ? "Bite 1" : "Bite 1 / Kick 2");
+    } else {
+        move(5, 2);
+        clrtoeol();
     }
-    mvprintw(10, 2, "Last log:");
+    mvprintw(7, 2, "[A]ttack  [D]efend  [B]andage  [M]edkit  [F]lee  [I]ntimidate");
+    if (game->poison_turns > 0) {
+        mvprintw(9, 2, "Poisoned: %d turns remaining", game->poison_turns);
+    } else {
+        move(9, 2);
+        clrtoeol();
+    }
+    mvprintw(11, 2, "Last log:");
     for (int i = 0; i < game->log.count && i < 5; ++i) {
         int index = (game->log.head - game->log.count + i + NEWS_TICKER_LINES) % NEWS_TICKER_LINES;
-        mvprintw(11 + i, 4, "%s", game->log.text[index]);
+        mvprintw(12 + i, 4, "%s", game->log.text[index]);
     }
     refresh();
 }
@@ -44,6 +63,7 @@ static void draw_combat_screen(const game_t *game, const enemy_t *enemy, int ene
 combat_result_t combat_run(game_t *game, enemy_id_t enemy_id, const char *title) {
     const enemy_t *enemy = &ENEMIES[enemy_id];
     int enemy_hp = enemy->max_hp;
+    int mule_hp = game->player.has_mule ? 8 : 0;
     bool defending = false;
 
     while (game->player.hp > 0 && enemy_hp > 0) {
@@ -58,7 +78,7 @@ combat_result_t combat_run(game_t *game, enemy_id_t enemy_id, const char *title)
             }
         }
 
-        draw_combat_screen(game, enemy, enemy_hp, title);
+        draw_combat_screen(game, enemy, enemy_hp, mule_hp, game->player.has_cart, title);
         ch = getch();
 
         switch (ch) {
@@ -116,15 +136,43 @@ combat_result_t combat_run(game_t *game, enemy_id_t enemy_id, const char *title)
             break;
         }
 
+        if (mule_hp > 0) {
+            int mule_base_damage = game->player.has_cart ? 1 : rng_chance(game, 50) ? 1 : 2;
+            int mule_damage = clamp_int(mule_base_damage - enemy->dr, 0, 99);
+
+            enemy_hp -= mule_damage;
+            if (mule_base_damage == 2) {
+                game_log(game, "Your mule kicks %s for %d HP.", enemy->name, mule_damage);
+            } else {
+                game_log(game, "Your mule bites %s for %d HP.", enemy->name, mule_damage);
+            }
+            if (enemy_hp <= 0) {
+                break;
+            }
+        }
+
         {
-            int armor = player_armor_dr(&game->player) + (defending ? 2 : 0);
-            int damage = clamp_int(enemy->damage + rng_range(game, -1, 1) - armor, 0, 99);
+            bool hits_mule = mule_hp > 0 && rng_chance(game, 35);
+            int defend_bonus = defending ? 2 : 0;
             defending = false;
-            game->player.hp -= damage;
-            game_log(game, "%s hits you for %d HP.", enemy->name, damage);
-            if (enemy->poisonous && damage > 0 && rng_chance(game, 50)) {
-                game->poison_turns = clamp_int(game->poison_turns + 3, 0, 6);
-                game_log(game, "Poison burns into the wound.");
+
+            if (hits_mule) {
+                int damage = clamp_int(enemy->damage + rng_range(game, -1, 1), 0, 99);
+                mule_hp -= damage;
+                game_log(game, "%s hits your mule for %d HP.", enemy->name, damage);
+                if (mule_hp <= 0) {
+                    mule_hp = 0;
+                    world_handle_mule_death(game);
+                }
+            } else {
+                int armor = player_armor_dr(&game->player) + defend_bonus;
+                int damage = clamp_int(enemy->damage + rng_range(game, -1, 1) - armor, 0, 99);
+                game->player.hp -= damage;
+                game_log(game, "%s hits you for %d HP.", enemy->name, damage);
+                if (enemy->poisonous && damage > 0 && rng_chance(game, 50)) {
+                    game->poison_turns = clamp_int(game->poison_turns + 3, 0, 6);
+                    game_log(game, "Poison burns into the wound.");
+                }
             }
         }
     }
@@ -138,6 +186,10 @@ combat_result_t combat_run(game_t *game, enemy_id_t enemy_id, const char *title)
         int payout = rng_range(game, enemy->bounty_min, enemy->bounty_max);
         game->player.credits += payout;
         game_log(game, "%s is down. You recover %d cr from the scene.", enemy->name, payout);
+    }
+    if (enemy->max_hp > 10) {
+        game->player.reputation++;
+        game_log(game, "Word of the kill spreads. Reputation +1.");
     }
     return COMBAT_RESULT_WON;
 }

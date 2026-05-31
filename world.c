@@ -138,7 +138,94 @@ bool world_are_connected(location_id_t from, location_id_t to) {
 }
 
 static int drop_value(const drop_slot_t *slot) {
-    return COMMODITIES[slot->commodity].base_price * slot->quantity;
+    if (!slot->occupied) {
+        return 0;
+    }
+    if (slot->kind == DROP_KIND_CART) {
+        return SHOP_ITEMS[SHOP_ITEM_CART].cost;
+    }
+    if (slot->kind == DROP_KIND_COMMODITY) {
+        return COMMODITIES[slot->commodity].base_price * slot->quantity;
+    }
+    return 0;
+}
+
+static void clear_drop_slot(drop_slot_t *slot) {
+    slot->occupied = false;
+    slot->kind = DROP_KIND_NONE;
+    slot->commodity = COMMODITY_FOOD_RATIONS;
+    slot->quantity = 0;
+    slot->age = 0;
+}
+
+static void on_drop_removed(game_t *game, const drop_slot_t *slot, bool scavenged) {
+    if (!slot->occupied || slot->kind != DROP_KIND_CART) {
+        return;
+    }
+
+    if (!game->player.has_cart) {
+        game->player.owns_cart = false;
+        if (scavenged) {
+            game_log(game, "Scavengers hauled off an abandoned cart.");
+        }
+    }
+}
+
+static bool world_place_drop(game_t *game,
+                             location_id_t location,
+                             drop_kind_t kind,
+                             commodity_id_t commodity,
+                             int quantity) {
+    location_drops_t *drops = &game->drops[location];
+    int empty_slot = -1;
+    int worst_slot = -1;
+
+    for (int i = 0; i < MAX_DROP_STACKS_PER_LOCATION; ++i) {
+        drop_slot_t *slot = &drops->slots[i];
+
+        if (!slot->occupied) {
+            if (empty_slot < 0) {
+                empty_slot = i;
+            }
+            continue;
+        }
+
+        if (kind == DROP_KIND_COMMODITY &&
+            slot->kind == DROP_KIND_COMMODITY &&
+            slot->commodity == commodity) {
+            slot->quantity += quantity;
+            slot->age = 0;
+            return true;
+        }
+        if (kind == DROP_KIND_CART && slot->kind == DROP_KIND_CART) {
+            slot->age = 0;
+            return true;
+        }
+
+        if (worst_slot < 0 ||
+            drops->slots[i].age > drops->slots[worst_slot].age ||
+            (drops->slots[i].age == drops->slots[worst_slot].age &&
+             drop_value(&drops->slots[i]) < drop_value(&drops->slots[worst_slot]))) {
+            worst_slot = i;
+        }
+    }
+
+    if (empty_slot < 0) {
+        empty_slot = worst_slot;
+    }
+    if (empty_slot < 0) {
+        return false;
+    }
+
+    if (drops->slots[empty_slot].occupied) {
+        on_drop_removed(game, &drops->slots[empty_slot], false);
+    }
+    drops->slots[empty_slot].occupied = true;
+    drops->slots[empty_slot].kind = kind;
+    drops->slots[empty_slot].commodity = commodity;
+    drops->slots[empty_slot].quantity = quantity;
+    drops->slots[empty_slot].age = 0;
+    return true;
 }
 
 static void world_note_drops(game_t *game, location_id_t location) {
@@ -232,49 +319,24 @@ void world_decay_drops(game_t *game) {
             }
             drop->age++;
             if (rng_chance(game, 10)) {
-                drop->occupied = false;
+                on_drop_removed(game, drop, true);
+                clear_drop_slot(drop);
             }
         }
     }
 }
 
 bool world_drop_commodity(game_t *game, location_id_t location, commodity_id_t commodity, int quantity) {
-    location_drops_t *drops = &game->drops[location];
-    int empty_slot = -1;
-    int worst_slot = -1;
+    return world_place_drop(game, location, DROP_KIND_COMMODITY, commodity, quantity);
+}
 
-    for (int i = 0; i < MAX_DROP_STACKS_PER_LOCATION; ++i) {
-        drop_slot_t *slot = &drops->slots[i];
-        if (slot->occupied && slot->commodity == commodity) {
-            slot->quantity += quantity;
-            slot->age = 0;
-            return true;
-        }
-        if (!slot->occupied && empty_slot < 0) {
-            empty_slot = i;
-        }
-        if (slot->occupied) {
-            if (worst_slot < 0 ||
-                drops->slots[i].age > drops->slots[worst_slot].age ||
-                (drops->slots[i].age == drops->slots[worst_slot].age &&
-                 drop_value(&drops->slots[i]) < drop_value(&drops->slots[worst_slot]))) {
-                worst_slot = i;
-            }
-        }
-    }
+bool world_drop_cart(game_t *game, location_id_t location) {
+    bool dropped = world_place_drop(game, location, DROP_KIND_CART, COMMODITY_FOOD_RATIONS, 1);
 
-    if (empty_slot < 0) {
-        empty_slot = worst_slot;
+    if (dropped) {
+        game->player.owns_cart = true;
     }
-    if (empty_slot < 0) {
-        return false;
-    }
-
-    drops->slots[empty_slot].occupied = true;
-    drops->slots[empty_slot].commodity = commodity;
-    drops->slots[empty_slot].quantity = quantity;
-    drops->slots[empty_slot].age = 0;
-    return true;
+    return dropped;
 }
 
 bool world_pickup_drop(game_t *game, location_id_t location, int slot_index) {
@@ -287,13 +349,30 @@ bool world_pickup_drop(game_t *game, location_id_t location, int slot_index) {
     if (!slot->occupied) {
         return false;
     }
+
+    if (slot->kind == DROP_KIND_CART) {
+        if (!game->player.has_mule) {
+            game_log(game, "You need a mule to hitch this cart.");
+            return false;
+        }
+        if (game->player.has_cart) {
+            game_log(game, "Your mule is already pulling a cart.");
+            return false;
+        }
+        game->player.has_cart = true;
+        game->player.owns_cart = true;
+        game_log(game, "You hitch the recovered cart to your mule.");
+        clear_drop_slot(slot);
+        return true;
+    }
+
     if (!player_add_cargo(&game->player, slot->commodity, slot->quantity)) {
         game_log(game, "Not enough space for %s.", COMMODITIES[slot->commodity].name);
         return false;
     }
 
     game_log(game, "Picked up %d x %s.", slot->quantity, COMMODITIES[slot->commodity].name);
-    slot->occupied = false;
+    clear_drop_slot(slot);
     return true;
 }
 
@@ -306,4 +385,63 @@ int world_visible_drop_count(const game_t *game, location_id_t location) {
         }
     }
     return count;
+}
+
+static int spill_excess_cargo(game_t *game, location_id_t location, int target_capacity_tenths) {
+    int spilled_tenths = 0;
+
+    while (player_cargo_used_tenths(&game->player) > target_capacity_tenths && game->player.cargo_count > 0) {
+        cargo_stack_t stack = game->player.cargo[game->player.cargo_count - 1];
+        int unit_tenths = COMMODITIES[stack.commodity].units_tenths;
+        int overflow_tenths = player_cargo_used_tenths(&game->player) - target_capacity_tenths;
+        int quantity = (overflow_tenths + unit_tenths - 1) / unit_tenths;
+
+        quantity = clamp_int(quantity, 1, stack.quantity);
+        if (!player_remove_cargo(&game->player, stack.commodity, quantity)) {
+            break;
+        }
+
+        spilled_tenths += unit_tenths * quantity;
+        if (!world_drop_commodity(game, location, stack.commodity, quantity)) {
+            game_log(game, "Spilled %d x %s, but scavengers got there first.", quantity, COMMODITIES[stack.commodity].name);
+        } else {
+            game_log(game, "Spilled %d x %s from overloaded cargo.", quantity, COMMODITIES[stack.commodity].name);
+        }
+    }
+
+    return spilled_tenths;
+}
+
+void world_handle_mule_death(game_t *game) {
+    location_id_t location = game->player.location;
+    bool had_cart = game->player.has_cart;
+    int spilled_tenths;
+    int target_capacity_tenths;
+
+    if (!game->player.has_mule) {
+        return;
+    }
+
+    game->player.has_mule = false;
+    game_log(game, "Your mule collapses and dies.");
+
+    if (had_cart) {
+        game->player.has_cart = false;
+        if (world_drop_cart(game, location)) {
+            game_log(game, "The cart breaks free and is left on the ground.");
+        } else {
+            game->player.owns_cart = false;
+            game_log(game, "The cart is lost in the chaos.");
+        }
+    }
+
+    target_capacity_tenths = player_cargo_capacity_tenths(&game->player);
+    spilled_tenths = spill_excess_cargo(game, location, target_capacity_tenths);
+    if (spilled_tenths > 0) {
+        game_log(game,
+                 "Without mule capacity, %d.%d cargo units spill at %s.",
+                 spilled_tenths / 10,
+                 spilled_tenths % 10,
+                 LOCATIONS[location].name);
+    }
 }
