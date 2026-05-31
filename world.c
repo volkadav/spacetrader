@@ -6,6 +6,7 @@
 #include "encounter.h"
 #include "market.h"
 #include "player.h"
+#include "save.h"
 #include "util.h"
 
 const location_def_t LOCATIONS[MAX_LOCATIONS] = {
@@ -26,9 +27,9 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .name = "Ashfield",
         .kind = LOCATION_KIND_SETTLEMENT,
         .art =
-            "_____  _____  _____\n"
-            "| . .| | . .| |HAY |\n"
-            "|FIELD| |FIELD| |BARN|\n",
+            " _____   _____   _____ \n"
+            "| . . | | . . | | HAY |\n"
+            "|FIELD| |FIELD| |BARN |\n",
         .description = "Pale grain fields and a dusty crossroads. Cheap food, modest liquor, hungry demand for tools.",
         .neighbors = {LOCATION_STARPORT, LOCATION_DUSTWALLOW, LOCATION_IRONPASS},
         .neighbor_count = 3
@@ -37,9 +38,10 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .name = "Brokenhill",
         .kind = LOCATION_KIND_SETTLEMENT,
         .art =
-            "  /\\    /##\\   /\\\n"
-            " /##\\  /####\\ /##\\\n"
-            "====== SHAFT 3 ======\n",
+            "   /\\      /\\      /\\\n"
+            "  /##\\    /##\\    /##\\\n"
+            " /####\\  /####\\  /####\\\n"
+            "=====[ SHAFT 3 ]=======\n",
         .description = "Ore dust, mine shafts, and hard stares. The cheapest metal on the Reach moves through here.",
         .neighbors = {LOCATION_STARPORT, LOCATION_IRONPASS, LOCATION_SALTMARSH},
         .neighbor_count = 3
@@ -48,9 +50,10 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .name = "Millhaven",
         .kind = LOCATION_KIND_SETTLEMENT,
         .art =
-            "[SILO] [SILO] [SILO]\n"
-            "  ||     ||     ||\n"
-            " MILLHAVEN COMMONS\n",
+            " [SILO]   [SILO]   [SILO]\n"
+            " |    |   |    |   |    |\n"
+            " |    |   |    |   |    |\n"
+            " [MILLHAVEN COMMONS]\n",
         .description = "A quiet farming collective with surplus grain and little patience for outsiders.",
         .neighbors = {LOCATION_STARPORT, LOCATION_SALTMARSH, LOCATION_BARRENS},
         .neighbor_count = 3
@@ -60,7 +63,8 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .kind = LOCATION_KIND_SETTLEMENT,
         .art =
             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-            "~   RIVER CROSSING FERRY      ~\n"
+            "~ ~ ~ RIVER CROSSING FERRY ~ ~ ~\n"
+            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
             " COLDWATER STATION\n",
         .description = "A river trade post with steady stock and balanced prices. Reliable, never cheap enough to brag about.",
         .neighbors = {LOCATION_STARPORT, LOCATION_BARRENS, LOCATION_DUSTWALLOW},
@@ -71,7 +75,8 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .kind = LOCATION_KIND_WILDERNESS,
         .art =
             "~~ ~~ ~~ DUSTWALLOW FENS ~~ ~~\n"
-            "fog, reeds, drowned trees\n",
+            "fog, reeds, drowned trees\n"
+            "~~ ~~ ~~ ~~ ~~ ~~ ~~ ~~ ~~ ~~\n",
         .description = "Swampy wetlands rich in herbs and furs, with poor footing and something large in the mist.",
         .neighbors = {LOCATION_ASHFIELD, LOCATION_COLDWATER},
         .neighbor_count = 2
@@ -80,8 +85,10 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .name = "Ironpass",
         .kind = LOCATION_KIND_WILDERNESS,
         .art =
-            "   /\\   IRON PASS   /\\\n"
-            "==++====++====++=====\n",
+            "    /\\      /\\      /\\\n"
+            "   /##\\____/##\\____/##\\\n"
+            "==/####\\==/####\\==/####\\==\n"
+            "  scree, rust, switchbacks\n",
         .description = "A narrow mountain pass littered with rusted equipment, exposed ore, and bandit ambush spots.",
         .neighbors = {LOCATION_ASHFIELD, LOCATION_BROKENHILL},
         .neighbor_count = 2
@@ -92,7 +99,7 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .art =
             "=-=-=-=-=-=-=-=-=-=-=-=\n"
             "~~     SALTMARSH    ~~\n"
-            "OPEN COASTLINE\n",
+            "~~~~~~~~~~~~~~~~~~~~~~~\n",
         .description = "Half-buried wreckage and soft tidal channels. Salvage is common; storms arrive without warning.",
         .neighbors = {LOCATION_BROKENHILL, LOCATION_MILLHAVEN},
         .neighbor_count = 2
@@ -101,8 +108,11 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
         .name = "The Barrens",
         .kind = LOCATION_KIND_WILDERNESS,
         .art =
-            ". . . . THE BARRENS . . . .\n"
-            "cracked clay, heat shimmer\n",
+            "._._*.__ THE BARRENS __.*_._.\n"
+            ".__._.._*.__._.._*.__._..__.\n"
+            "._..__._.._*.__._..__._  (x x)\n"
+            ".__._.._*.__._.._*.__._  |~~~|\n"
+            "._*.__._..__.*_._..__._*_.\n",
         .description = "Cracked clay, bare rock, and gemstone veins close to the surface. Brutal and lucrative.",
         .neighbors = {LOCATION_MILLHAVEN, LOCATION_COLDWATER},
         .neighbor_count = 2
@@ -138,6 +148,14 @@ static void world_note_drops(game_t *game, location_id_t location) {
     }
 }
 
+static void world_autosave(game_t *game) {
+    char error[128];
+
+    if (!save_game(game, error, sizeof(error))) {
+        game_log(game, "Autosave failed: %s", error);
+    }
+}
+
 void world_arrive(game_t *game, location_id_t location, bool travelled) {
     game->player.location = location;
     if (market_has_open_market(location)) {
@@ -147,6 +165,7 @@ void world_arrive(game_t *game, location_id_t location, bool travelled) {
         game_log(game, "Arrived at %s.", LOCATIONS[location].name);
     }
     world_note_drops(game, location);
+    world_autosave(game);
 }
 
 bool world_travel(game_t *game, location_id_t destination) {

@@ -16,40 +16,208 @@
 
 static const int LEFT_WIDTH = 48;
 static const int RIGHT_X = 50;
+static const int LEFT_TEXT_X = 2;
+static const int LEFT_TEXT_WIDTH = 45;
+static const int MAX_WRAP_LINES = 96;
+static const int HP_COLOR_PAIR_HEALTHY = 1;
+static const int HP_COLOR_PAIR_WOUNDED = 2;
+static const int HP_COLOR_PAIR_CRITICAL = 3;
+static bool ui_colors_enabled = false;
+static bool confirm_exit_game(void);
+
+static int hp_color_pair(const game_t *game) {
+    int hp = game->player.hp;
+
+    if (!ui_colors_enabled) {
+        return 0;
+    }
+
+    if (hp >= 7) {
+        return HP_COLOR_PAIR_HEALTHY;
+    }
+    if (hp >= 4) {
+        return HP_COLOR_PAIR_WOUNDED;
+    }
+    return HP_COLOR_PAIR_CRITICAL;
+}
 
 static void draw_hp_bar(const game_t *game, int row, int col) {
-    int filled = (game->player.hp * 10) / game->player.max_hp;
+    int max_hp = game->player.max_hp > 0 ? game->player.max_hp : 1;
+    int filled = clamp_int((game->player.hp * 10) / max_hp, 0, 10);
+    int color_pair = hp_color_pair(game);
+
     mvprintw(row, col, "HP: ");
-    for (int i = 0; i < 10; ++i) {
-        addch(i < filled ? '#' : '.');
+    if (color_pair != 0) {
+        attron(COLOR_PAIR(color_pair));
     }
+    for (int i = 0; i < filled; ++i) {
+        addch('#');
+    }
+    if (color_pair != 0) {
+        attroff(COLOR_PAIR(color_pair));
+    }
+    for (int i = filled; i < 10; ++i) {
+        addch('.');
+    }
+
     printw(" %d/%d", game->player.hp, game->player.max_hp);
+}
+
+static int clamp_scroll_offset(int scroll, int total_lines, int visible_rows) {
+    int max_scroll = total_lines - visible_rows;
+
+    if (max_scroll < 0) {
+        max_scroll = 0;
+    }
+    if (scroll < 0) {
+        return 0;
+    }
+    if (scroll > max_scroll) {
+        return max_scroll;
+    }
+    return scroll;
+}
+
+static int wrap_text_lines(const char *text, int width, char lines[][LOG_LINE_LENGTH], int max_lines) {
+    const char *cursor = text;
+    int count = 0;
+
+    if (text == NULL || width <= 0 || max_lines <= 0) {
+        return 0;
+    }
+
+    while (*cursor != '\0' && count < max_lines) {
+        const char *segment_end = cursor;
+
+        while (*segment_end != '\0' && *segment_end != '\n') {
+            segment_end++;
+        }
+
+        if (cursor == segment_end) {
+            lines[count][0] = '\0';
+            count++;
+        } else {
+            const char *segment = cursor;
+
+            while (segment < segment_end && count < max_lines) {
+                size_t take;
+
+                while (segment < segment_end && *segment == ' ') {
+                    segment++;
+                }
+                if (segment >= segment_end) {
+                    break;
+                }
+
+                take = (size_t)(segment_end - segment);
+                if (take > (size_t)width) {
+                    size_t split = (size_t)width;
+
+                    while (split > 0 && segment[split] != ' ') {
+                        split--;
+                    }
+                    if (split > 0) {
+                        take = split;
+                    } else {
+                        take = (size_t)width;
+                    }
+                }
+                while (take > 0 && segment[take - 1] == ' ') {
+                    take--;
+                }
+                if (take == 0) {
+                    take = 1;
+                }
+                if (take >= LOG_LINE_LENGTH) {
+                    take = LOG_LINE_LENGTH - 1;
+                }
+
+                memcpy(lines[count], segment, take);
+                lines[count][take] = '\0';
+                count++;
+
+                segment += take;
+                while (segment < segment_end && *segment == ' ') {
+                    segment++;
+                }
+            }
+        }
+
+        cursor = (*segment_end == '\n') ? (segment_end + 1) : segment_end;
+    }
+
+    return count;
+}
+
+static void draw_clipped_multiline(const char *text, int row, int col, int width, int height) {
+    const char *cursor = text;
+
+    for (int i = 0; i < height; ++i) {
+        mvhline(row + i, col, ' ', width);
+    }
+    if (text == NULL || width <= 0 || height <= 0) {
+        return;
+    }
+
+    for (int line = 0; line < height && *cursor != '\0'; ++line) {
+        const char *line_end = cursor;
+        size_t take;
+
+        while (*line_end != '\0' && *line_end != '\n') {
+            line_end++;
+        }
+
+        take = (size_t)(line_end - cursor);
+        if (take > (size_t)width) {
+            take = (size_t)width;
+        }
+
+        mvaddnstr(row + line, col, cursor, (int)take);
+        cursor = (*line_end == '\n') ? (line_end + 1) : line_end;
+    }
+}
+
+static int draw_wrapped_text(const char *text, int row, int col, int width, int height, int scroll) {
+    char lines[MAX_WRAP_LINES][LOG_LINE_LENGTH];
+    int line_count = wrap_text_lines(text, width, lines, MAX_WRAP_LINES);
+    int offset = clamp_scroll_offset(scroll, line_count, height);
+
+    for (int i = 0; i < height; ++i) {
+        int line_index = offset + i;
+
+        mvhline(row + i, col, ' ', width);
+        if (line_index < line_count) {
+            mvaddnstr(row + i, col, lines[line_index], width);
+        }
+    }
+
+    return line_count;
 }
 
 static void draw_inventory_panel(const game_t *game) {
     int used = player_cargo_used_tenths(&game->player);
     int capacity = player_cargo_capacity_tenths(&game->player);
 
-    mvprintw(1, RIGHT_X, "Inventory (%d.%d/%d.%d u)",
+    mvprintw(2, RIGHT_X, "Inventory (%d.%d/%d.%d u)",
              used / 10, used % 10, capacity / 10, capacity % 10);
-    for (int i = 0; i < 12; ++i) {
-        move(2 + i, RIGHT_X);
+    for (int i = 0; i < 9; ++i) {
+        move(3 + i, RIGHT_X);
         clrtoeol();
     }
-    for (int i = 0; i < game->player.cargo_count && i < 10; ++i) {
+    for (int i = 0; i < game->player.cargo_count && i < 9; ++i) {
         const cargo_stack_t *stack = &game->player.cargo[i];
         int units = COMMODITIES[stack->commodity].units_tenths * stack->quantity;
-        mvprintw(2 + i, RIGHT_X, "%-17s x%-3d %2d.%d u",
+        mvprintw(3 + i, RIGHT_X, "%-17s x%-3d %2d.%d u",
                  COMMODITIES[stack->commodity].name,
                  stack->quantity,
                  units / 10,
                  units % 10);
     }
 
-    mvprintw(14, RIGHT_X, "Weapon: %s", WEAPONS[game->player.weapon].name);
-    mvprintw(15, RIGHT_X, "Armor:  %s", ARMORS[game->player.armor].name);
-    mvprintw(16, RIGHT_X, "Bandages: %d", game->player.bandages);
-    mvprintw(17, RIGHT_X, "Medkit uses: %d", game->player.medkit_uses);
+    mvprintw(15, RIGHT_X, "Weapon: %s", WEAPONS[game->player.weapon].name);
+    mvprintw(16, RIGHT_X, "Armor:  %s", ARMORS[game->player.armor].name);
+    mvprintw(17, RIGHT_X, "Bandages: %d", game->player.bandages);
+    mvprintw(18, RIGHT_X, "Medkit uses: %d", game->player.medkit_uses);
 }
 
 static void draw_log_panel(const game_t *game) {
@@ -75,10 +243,11 @@ static void draw_base_frame(const game_t *game, const char *commands) {
     mvprintw(0, 30, "Turn: %d", game->turn);
     mvprintw(0, 45, "Credits: %d", game->player.credits);
     mvprintw(0, 65, "Rep: %d", game->player.reputation);
-    for (int row = 1; row < 21; ++row) {
+    mvhline(20, 0, '-', 80);
+    for (int row = 1; row <= 20; ++row) {
         mvaddch(row, LEFT_WIDTH, '|');
     }
-    mvhline(20, 0, '-', 80);
+    mvaddch(20, LEFT_WIDTH, '+');
     draw_inventory_panel(game);
     draw_hp_bar(game, 19, 2);
     mvprintw(19, 26, "Location: %s", location->name);
@@ -87,30 +256,51 @@ static void draw_base_frame(const game_t *game, const char *commands) {
     refresh();
 }
 
-static void draw_location_view(const game_t *game) {
+static int draw_location_view(const game_t *game, int description_scroll) {
     const location_def_t *location = world_get_location(game->player.location);
-    const char *commands;
+    char commands[128];
+    const char *ground_option = "";
+    bool has_ground = world_visible_drop_count(game, game->player.location) > 0;
+    int description_lines;
+
+    if (has_ground) {
+        ground_option = " [G]round";
+    }
 
     if (location->kind == LOCATION_KIND_WILDERNESS) {
-        commands = "[P]rospect [R]est [T]ravel [I]nventory [G]round [V]Save [Q]uit";
+        snprintf(commands, sizeof(commands), "[1-4]Travel [P]rospect [R]est [I]nventory%s [V]Save [Q]uit", ground_option);
     } else if (game->player.location == LOCATION_STARPORT) {
-        commands = "[M]arket [B]ar [H]ospital [N]otice [T]ravel [I]nv [X]Pay [V]Save [Q]uit";
+        snprintf(commands, sizeof(commands), "[1-4]Travel [M]arket [B]ar [H]ospital [N]otice [I]nv%s [X]Pay [V]Save [Q]uit", ground_option);
     } else {
-        commands = "[S]tore [B]ar [C]linic [T]ravel [I]nventory [G]round [V]Save [Q]uit";
+        snprintf(commands, sizeof(commands), "[1-4]Travel [S]tore [B]ar [C]linic [I]nventory%s [V]Save [Q]uit", ground_option);
     }
 
     draw_base_frame(game, commands);
     mvprintw(2, 2, "%s", location->name);
-    mvprintw(4, 2, "%s", location->art);
-    mvprintw(9, 2, "%s", location->description);
-    mvprintw(12, 2, "Routes:");
+    draw_clipped_multiline(location->art, 4, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 5);
+    description_lines = draw_wrapped_text(location->description, 9, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 3, description_scroll);
+    if (description_lines > 3) {
+        mvprintw(8, 2, "PgUp/PgDn to scroll description");
+    } else {
+        mvhline(8, LEFT_TEXT_X, ' ', LEFT_TEXT_WIDTH);
+    }
+    mvprintw(13, 2, "Routes (1-4):");
     for (int i = 0; i < location->neighbor_count; ++i) {
-        mvprintw(13 + i, 4, "%d. %s", i + 1, LOCATIONS[location->neighbors[i]].name);
+        mvprintw(14 + i, 4, "%d. %s", i + 1, LOCATIONS[location->neighbors[i]].name);
     }
-    if (world_visible_drop_count(game, game->player.location) > 0) {
-        mvprintw(17, 2, "Dropped cargo is visible here.");
+    if (has_ground) {
+        mvprintw(18, 2, "Dropped cargo is visible here.");
     }
+    for (int row = 1; row <= 20; ++row) {
+        mvaddch(row, LEFT_WIDTH, '|');
+    }
+    mvhline(12, 0, '-', LEFT_WIDTH);
+    mvhline(12, RIGHT_X, '-', 80 - RIGHT_X);
+    mvaddch(12, LEFT_WIDTH, '+');
+    mvaddch(20, LEFT_WIDTH, '+');
     refresh();
+
+    return description_lines;
 }
 
 static void show_notice_board(game_t *game) {
@@ -278,31 +468,78 @@ static void ground_menu(game_t *game) {
 
 static void trade_menu(game_t *game, bool fence) {
     int selected = 0;
+    int top = 0;
     int running = 1;
+    int options[NUM_COMMODITIES];
+    int option_count = 0;
+    const int list_row = 4;
+    const int list_height = 14;
+
+    for (int i = 0; i < NUM_COMMODITIES; ++i) {
+        bool show = fence ? (i == COMMODITY_NARCOTICS || i == COMMODITY_STOLEN_GOODS || i == COMMODITY_ARTIFACTS)
+                          : true;
+        if (show) {
+            options[option_count++] = i;
+        }
+    }
 
     while (running) {
-        draw_base_frame(game, fence ? "[Up/Down] [S]ell one [A]ll [Esc]" :
-                               "[Up/Down] [B]uy one [M]ax [S]ell one [A]ll [Esc]");
+        draw_base_frame(game, fence ? "[Up/Down] [PgUp/PgDn] [S]ell one [A]ll [Esc]" :
+                               "[Up/Down] [PgUp/PgDn] [B]uy one [M]ax [S]ell one [A]ll [Esc]");
         mvprintw(2, 2, fence ? "Back-room Fence" : "Commodity Market");
-        for (int i = 0; i < NUM_COMMODITIES; ++i) {
-            int own = player_cargo_quantity(&game->player, (commodity_id_t)i);
-            int price = fence ? market_fence_price((commodity_id_t)i) :
-                                (market_can_sell_openly(game->player.location, (commodity_id_t)i)
-                                     ? market_sell_price(game, game->player.location, (commodity_id_t)i)
-                                     : market_buy_price(game, game->player.location, (commodity_id_t)i));
-            int stock = game->markets[game->player.location].stock[i];
-            bool show = fence ? (i == COMMODITY_NARCOTICS || i == COMMODITY_STOLEN_GOODS || i == COMMODITY_ARTIFACTS)
-                              : true;
-
-            if (!show) {
-                continue;
+        if (option_count == 0) {
+            mvprintw(4, 2, "No commodities available.");
+            refresh();
+            switch (getch()) {
+            case 27:
+            case 'q':
+            case 'Q':
+                running = 0;
+                break;
+            default:
+                break;
             }
-            if (i == selected) {
+            continue;
+        }
+        selected = clamp_int(selected, 0, option_count - 1);
+        if (selected < top) {
+            top = selected;
+        } else if (selected >= top + list_height) {
+            top = selected - list_height + 1;
+        }
+        top = clamp_scroll_offset(top, option_count, list_height);
+
+        mvprintw(3, 2, "Showing %d-%d of %d",
+                 option_count == 0 ? 0 : (top + 1),
+                 option_count == 0 ? 0 : clamp_int(top + list_height, 0, option_count),
+                 option_count);
+        for (int row = 0; row < list_height; ++row) {
+            mvhline(list_row + row, LEFT_TEXT_X, ' ', LEFT_TEXT_WIDTH);
+        }
+
+        for (int row = 0; row < list_height && (top + row) < option_count; ++row) {
+            int commodity_index = options[top + row];
+            int own = player_cargo_quantity(&game->player, (commodity_id_t)commodity_index);
+            int price = market_fence_price((commodity_id_t)commodity_index);
+            int stock = game->markets[game->player.location].stock[commodity_index];
+            char line[LOG_LINE_LENGTH];
+
+            if (!fence) {
+                price = market_can_sell_openly(game->player.location, (commodity_id_t)commodity_index)
+                            ? market_sell_price(game, game->player.location, (commodity_id_t)commodity_index)
+                            : market_buy_price(game, game->player.location, (commodity_id_t)commodity_index);
+                snprintf(line, sizeof(line), "%-18.18s %4d cr  st:%2d own:%2d",
+                         COMMODITIES[commodity_index].name, price, stock, own);
+            } else {
+                snprintf(line, sizeof(line), "%-18.18s %4d cr  own:%2d",
+                         COMMODITIES[commodity_index].name, price, own);
+            }
+
+            if ((top + row) == selected) {
                 attron(A_REVERSE);
             }
-            mvprintw(4 + i, 2, "%-22s %4d cr  stock:%2d own:%2d",
-                     COMMODITIES[i].name, price, stock, own);
-            if (i == selected) {
+            mvaddnstr(list_row + row, LEFT_TEXT_X, line, LEFT_TEXT_WIDTH);
+            if ((top + row) == selected) {
                 attroff(A_REVERSE);
             }
         }
@@ -310,46 +547,52 @@ static void trade_menu(game_t *game, bool fence) {
 
         switch (getch()) {
         case KEY_UP:
-            selected = (selected == 0) ? (NUM_COMMODITIES - 1) : (selected - 1);
+            selected = (selected == 0) ? (option_count - 1) : (selected - 1);
             break;
         case KEY_DOWN:
-            selected = (selected + 1) % NUM_COMMODITIES;
+            selected = (selected + 1) % option_count;
+            break;
+        case KEY_PPAGE:
+            selected = clamp_int(selected - list_height, 0, option_count - 1);
+            break;
+        case KEY_NPAGE:
+            selected = clamp_int(selected + list_height, 0, option_count - 1);
             break;
         case 'b':
         case 'B':
             if (!fence) {
-                market_buy(game, game->player.location, (commodity_id_t)selected, 1);
+                market_buy(game, game->player.location, (commodity_id_t)options[selected], 1);
             }
             break;
         case 'm':
         case 'M':
             if (!fence) {
-                while (market_buy(game, game->player.location, (commodity_id_t)selected, 1)) {
+                while (market_buy(game, game->player.location, (commodity_id_t)options[selected], 1)) {
                 }
             }
             break;
         case 's':
         case 'S':
             if (fence) {
-                if (player_remove_cargo(&game->player, (commodity_id_t)selected, 1)) {
-                    int payout = market_fence_price((commodity_id_t)selected);
+                if (player_remove_cargo(&game->player, (commodity_id_t)options[selected], 1)) {
+                    int payout = market_fence_price((commodity_id_t)options[selected]);
                     game->player.credits += payout;
-                    game_log(game, "Fenced 1 x %s for %d cr.", COMMODITIES[selected].name, payout);
+                    game_log(game, "Fenced 1 x %s for %d cr.", COMMODITIES[options[selected]].name, payout);
                 }
             } else {
-                market_sell(game, game->player.location, (commodity_id_t)selected, 1);
+                market_sell(game, game->player.location, (commodity_id_t)options[selected], 1);
             }
             break;
         case 'a':
         case 'A': {
-            int qty = player_cargo_quantity(&game->player, (commodity_id_t)selected);
+            int qty = player_cargo_quantity(&game->player, (commodity_id_t)options[selected]);
             if (qty > 0) {
                 if (fence) {
-                    player_remove_cargo(&game->player, (commodity_id_t)selected, qty);
-                    game->player.credits += market_fence_price((commodity_id_t)selected) * qty;
-                    game_log(game, "Fenced %d x %s.", qty, COMMODITIES[selected].name);
+                    player_remove_cargo(&game->player, (commodity_id_t)options[selected], qty);
+                    game->player.credits += market_fence_price((commodity_id_t)options[selected]) * qty;
+                    game_log(game, "Fenced %d x %s.", qty, COMMODITIES[options[selected]].name);
                 } else {
-                    market_sell(game, game->player.location, (commodity_id_t)selected, qty);
+                    market_sell(game, game->player.location, (commodity_id_t)options[selected], qty);
                 }
             }
             break;
@@ -367,39 +610,93 @@ static void trade_menu(game_t *game, bool fence) {
 
 static void store_menu(game_t *game) {
     int selected = 0;
+    int top = 0;
     int running = 1;
+    int options[SHOP_ITEM_COUNT];
+    int option_count = 0;
+    const int list_row = 4;
+    const int list_height = 10;
+
+    for (int i = 0; i < SHOP_ITEM_COUNT; ++i) {
+        if (player_can_offer_shop_item(game->player.location, (shop_item_id_t)i)) {
+            options[option_count++] = i;
+        }
+    }
 
     while (running) {
-        draw_base_frame(game, "[Up/Down] [Enter] buy [Esc]");
+        draw_base_frame(game, "[Up/Down] [PgUp/PgDn] [Enter] buy [Esc]");
         mvprintw(2, 2, game->player.location == LOCATION_STARPORT ? "Starport Market Gear" : "Settlement Store");
-        for (int i = 0; i < SHOP_ITEM_COUNT; ++i) {
-            if (!player_can_offer_shop_item(game->player.location, (shop_item_id_t)i)) {
-                continue;
+        if (option_count == 0) {
+            mvprintw(4, 2, "No items available.");
+            refresh();
+            switch (getch()) {
+            case 27:
+            case 'q':
+            case 'Q':
+                running = 0;
+                break;
+            default:
+                break;
             }
-            if (i == selected) {
+            continue;
+        }
+        selected = clamp_int(selected, 0, option_count - 1);
+        if (selected < top) {
+            top = selected;
+        } else if (selected >= top + list_height) {
+            top = selected - list_height + 1;
+        }
+        top = clamp_scroll_offset(top, option_count, list_height);
+
+        mvprintw(3, 2, "Showing %d-%d of %d",
+                 option_count == 0 ? 0 : (top + 1),
+                 option_count == 0 ? 0 : clamp_int(top + list_height, 0, option_count),
+                 option_count);
+        for (int row = 0; row < list_height; ++row) {
+            mvhline(list_row + row, LEFT_TEXT_X, ' ', LEFT_TEXT_WIDTH);
+        }
+
+        for (int row = 0; row < list_height && (top + row) < option_count; ++row) {
+            int item = options[top + row];
+            char line[LOG_LINE_LENGTH];
+
+            snprintf(line, sizeof(line), "%-18s %4d cr%s",
+                     SHOP_ITEMS[item].name,
+                     (game->player.reputation >= 2 ? (SHOP_ITEMS[item].cost * 95) / 100 : SHOP_ITEMS[item].cost),
+                     player_owns_shop_item(&game->player, (shop_item_id_t)item) ? " [owned]" : "");
+            if ((top + row) == selected) {
                 attron(A_REVERSE);
             }
-            mvprintw(4 + i, 2, "%-20s %4d cr  %s%s",
-                     SHOP_ITEMS[i].name,
-                     (game->player.reputation >= 2 ? (SHOP_ITEMS[i].cost * 95) / 100 : SHOP_ITEMS[i].cost),
-                     SHOP_ITEMS[i].description,
-                     player_owns_shop_item(&game->player, (shop_item_id_t)i) ? " [owned]" : "");
-            if (i == selected) {
+            mvaddnstr(list_row + row, LEFT_TEXT_X, line, LEFT_TEXT_WIDTH);
+            if ((top + row) == selected) {
                 attroff(A_REVERSE);
             }
+        }
+
+        mvprintw(15, 2, "Description:");
+        if (option_count > 0) {
+            draw_wrapped_text(SHOP_ITEMS[options[selected]].description, 16, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 3, 0);
+        } else {
+            draw_wrapped_text("No items available.", 16, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 3, 0);
         }
         refresh();
 
         switch (getch()) {
         case KEY_UP:
-            selected = (selected == 0) ? (SHOP_ITEM_COUNT - 1) : (selected - 1);
+            selected = (selected == 0) ? (option_count - 1) : (selected - 1);
             break;
         case KEY_DOWN:
-            selected = (selected + 1) % SHOP_ITEM_COUNT;
+            selected = (selected + 1) % option_count;
+            break;
+        case KEY_PPAGE:
+            selected = clamp_int(selected - list_height, 0, option_count - 1);
+            break;
+        case KEY_NPAGE:
+            selected = clamp_int(selected + list_height, 0, option_count - 1);
             break;
         case '\n':
         case KEY_ENTER:
-            player_buy_shop_item(game, (shop_item_id_t)selected);
+            player_buy_shop_item(game, (shop_item_id_t)options[selected]);
             break;
         case 27:
         case 'q':
@@ -417,7 +714,7 @@ static void bar_menu(game_t *game) {
 
     encounter_on_bar_entry(game);
     while (running) {
-        draw_base_frame(game, "[R]oom [F]ence [U]rumour [B]rawl [Esc]");
+        draw_base_frame(game, "[R]oom [F]ence R[u]mors [B]rawl [Esc]");
         mvprintw(2, 2, "Bar");
         mvprintw(4, 2, "Room: 20 cr for +2 HP");
         mvprintw(5, 2, "Fence: contraband and artifacts at 70%% of base price");
@@ -478,12 +775,14 @@ static void heal_menu(game_t *game, bool hospital) {
     int running = 1;
     int per_hp = hospital ? 50 : (game->player.reputation >= 2 ? 20 : 25);
     int cap = hospital ? 8 : 3;
+    char service_text[LOG_LINE_LENGTH];
 
     while (running) {
         draw_base_frame(game, "[H]eal 1  [M]ax  [D]onate (clinic)  [Esc]");
         mvprintw(2, 2, hospital ? "Starport Medical" : "Settlement Clinic");
-        mvprintw(4, 2, "%s price: %d cr per HP, up to %d HP per visit",
+        snprintf(service_text, sizeof(service_text), "%s price: %d cr per HP, up to %d HP per visit",
                  hospital ? "Hospital" : "Clinic", per_hp, cap);
+        draw_wrapped_text(service_text, 4, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 2, 0);
         refresh();
 
         switch (getch()) {
@@ -620,8 +919,10 @@ static void title_screen(game_t *game) {
             break;
         case 'q':
         case 'Q':
-            game->running = false;
-            running = 0;
+            if (confirm_exit_game()) {
+                game->running = false;
+                running = 0;
+            }
             break;
         default:
             break;
@@ -653,11 +954,50 @@ static void save_current_game(game_t *game) {
     }
 }
 
-static void location_loop(game_t *game) {
+static bool confirm_exit_game(void) {
     int ch;
 
-    draw_location_view(game);
+    move(LINES - 2, 0);
+    clrtoeol();
+    mvprintw(LINES - 2, 2, "Quit game? [Y]es / [N]o");
+    refresh();
+
+    while (1) {
+        ch = getch();
+        if (ch == 'y' || ch == 'Y') {
+            return true;
+        }
+        if (ch == 'n' || ch == 'N' || ch == 27 || ch == 'q' || ch == 'Q') {
+            return false;
+        }
+    }
+}
+
+static void location_loop(game_t *game) {
+    static int description_scroll = 0;
+    static location_id_t scroll_location = LOCATION_STARPORT;
+    static bool scroll_initialized = false;
+    int description_lines;
+    int ch;
+
+    if (!scroll_initialized || scroll_location != game->player.location) {
+        scroll_location = game->player.location;
+        description_scroll = 0;
+        scroll_initialized = true;
+    }
+
+    description_lines = draw_location_view(game, description_scroll);
     ch = getch();
+    if (ch >= '1' && ch <= '4') {
+        const location_def_t *location = world_get_location(game->player.location);
+        int route_index = ch - '1';
+
+        if (route_index < location->neighbor_count) {
+            world_travel(game, (location_id_t)location->neighbors[route_index]);
+        }
+        return;
+    }
+
     switch (ch) {
     case 'm':
     case 'M':
@@ -720,7 +1060,9 @@ static void location_loop(game_t *game) {
         break;
     case 'g':
     case 'G':
-        ground_menu(game);
+        if (world_visible_drop_count(game, game->player.location) > 0) {
+            ground_menu(game);
+        }
         break;
     case 'x':
     case 'X':
@@ -734,7 +1076,15 @@ static void location_loop(game_t *game) {
         break;
     case 'q':
     case 'Q':
-        game->running = false;
+        if (confirm_exit_game()) {
+            game->running = false;
+        }
+        break;
+    case KEY_PPAGE:
+        description_scroll = clamp_scroll_offset(description_scroll - 1, description_lines, 3);
+        break;
+    case KEY_NPAGE:
+        description_scroll = clamp_scroll_offset(description_scroll + 1, description_lines, 3);
         break;
     default:
         break;
@@ -742,11 +1092,24 @@ static void location_loop(game_t *game) {
 }
 
 void ui_run(game_t *game) {
+    int hp_background = -1;
+
     initscr();
     cbreak();
     noecho();
     keypad(stdscr, true);
     curs_set(0);
+    if (has_colors()) {
+        start_color();
+        if (use_default_colors() == ERR) {
+            hp_background = COLOR_BLACK;
+        }
+        if (init_pair(HP_COLOR_PAIR_HEALTHY, COLOR_GREEN, hp_background) != ERR &&
+            init_pair(HP_COLOR_PAIR_WOUNDED, COLOR_YELLOW, hp_background) != ERR &&
+            init_pair(HP_COLOR_PAIR_CRITICAL, COLOR_RED, hp_background) != ERR) {
+            ui_colors_enabled = true;
+        }
+    }
 
     game->running = true;
     game->state = GAME_STATE_TITLE;

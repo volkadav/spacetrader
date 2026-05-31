@@ -1163,7 +1163,8 @@ Single-key commands throughout.  Quantity entry uses `+`/`−` or a typed number
 |-------------|-------------------|---------------------------------|
 | Arrow / hjkl| Travel map        | Move cursor between locations   |
 | Enter/Space | Most contexts     | Confirm / select                |
-| T           | Location          | Travel menu                     |
+| 1–4         | Location          | Travel to listed connected location |
+| T           | Location          | Travel menu (alternate)         |
 | P           | Wilderness        | Prospect                        |
 | R           | Wilderness        | Sleep rough (recover 1 HP, free, risky) |
 | S           | Settlement        | Visit Store                     |
