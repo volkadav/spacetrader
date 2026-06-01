@@ -26,6 +26,7 @@ It also detects GNU make (`make` or `gmake`) and generates a wrapper `Makefile` 
 ### Tested platforms
 
 Tested on:
+
     - amd64
         - Debian 13/Trixie (stable)
         - FreeBSD 15.0
