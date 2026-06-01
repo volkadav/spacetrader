@@ -1,16 +1,16 @@
 # spacetrader
 
 A simple TUI space trading/adventure game where you take the role of a down on their
-luck merchant adventurer trying to raise cash to get their starship out of the impound 
+luck merchant adventurer trying to raise cash to get their starship out of the impound
 lot of the starport on an outlying colony world, Kepler's Reach.
 
 ## Build
 
 ### Requirements
 
-  - a working C99 compiler
-  - gnu make
-  - ncurses (library and headers)
+- a working C99 compiler
+- gnu make
+- ncurses (library and headers)
 
 ```sh
 ./configure
@@ -22,6 +22,23 @@ detects a working curses setup (including BSD/Linux differences), and writes `Ma
 It also detects GNU make (`make` or `gmake`) and generates a wrapper `Makefile` that delegates to it.
 
 ## Install
+
+### Tested platforms
+
+Tested on:
+    - amd64
+        - Debian 13/Trixie (stable)
+        - FreeBSD 15.0
+        - OpenBSD 7.9
+        - OmniOS r151054 (LTS) (slight ui glitches atm)
+    - arm64
+        - Debian 13/Trixie (stable)
+
+(The code here is not that complex, so I suspect
+most any POSIX-y platform with a working C99
+compiler and ncurses available will work.)
+
+### Directions
 
 ```sh
 make install
