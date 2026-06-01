@@ -34,9 +34,9 @@ Tested on:
         - OmniOS r151054 (LTS) (slight ui glitches atm)
     - arm64
         - Debian 13/Trixie (stable)
+        - OpenBSD 7.9
 
-(The code here is not that complex, so I suspect
-most any POSIX-y platform with a working C99
+(The code here is not that complex, so I suspect that most any POSIX-y platform with a working C99
 compiler and ncurses available will work.)
 
 ### Directions
