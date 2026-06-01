@@ -3,8 +3,9 @@
 # executable name
 spacetrader
 
-# Makefile is configure-generated
+# Makefiles that are configure-generated
 Makefile
+GNUmakefile
 
 # Prerequisites
 *.d

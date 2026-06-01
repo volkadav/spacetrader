@@ -1255,6 +1255,8 @@ Implementation gaps to close against this design:
 - [x] Refine end-state presentation to match the richer victory/death flow described in this document.
 - [ ] Continue refactoring toward the planned module/state-table architecture for encounters, missions, and gambling systems.
 
+- [ ] Fix slight UI glitches on omnios
+
 ---
 
 *End of Design Document — v0.1*
