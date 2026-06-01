@@ -1,3 +1,4 @@
+/* player.h: Player inventory, equipment, cargo capacity, and shop item interfaces. */
 #ifndef SPACE_TRADER_PLAYER_H
 #define SPACE_TRADER_PLAYER_H
 

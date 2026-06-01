@@ -1,3 +1,4 @@
+/* world.c: World/location definitions plus travel, arrival, and ground-drop behavior. */
 #include "world.h"
 
 #include <stdio.h>
@@ -119,10 +120,25 @@ const location_def_t LOCATIONS[MAX_LOCATIONS] = {
     }
 };
 
+/**
+ * Purpose: Implements world get location.
+ * Parameters:
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ * Returns:
+ *   - const location_def_t *: Pointer result selected by this routine.
+ */
 const location_def_t *world_get_location(location_id_t location) {
     return &LOCATIONS[location];
 }
 
+/**
+ * Purpose: Implements world are connected.
+ * Parameters:
+ *   - from (location_id_t): Location identifier used to select travel or market context.
+ *   - to (location_id_t): Location identifier used to select travel or market context.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool world_are_connected(location_id_t from, location_id_t to) {
     const location_def_t *location = &LOCATIONS[from];
 
@@ -137,6 +153,13 @@ bool world_are_connected(location_id_t from, location_id_t to) {
     return false;
 }
 
+/**
+ * Purpose: Implements drop value.
+ * Parameters:
+ *   - slot (const drop_slot_t *): Input argument used by this routine.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int drop_value(const drop_slot_t *slot) {
     if (!slot->occupied) {
         return 0;
@@ -150,6 +173,11 @@ static int drop_value(const drop_slot_t *slot) {
     return 0;
 }
 
+/**
+ * Purpose: Implements clear drop slot.
+ * Parameters:
+ *   - slot (drop_slot_t *): Input argument used by this routine.
+ */
 static void clear_drop_slot(drop_slot_t *slot) {
     slot->occupied = false;
     slot->kind = DROP_KIND_NONE;
@@ -158,6 +186,13 @@ static void clear_drop_slot(drop_slot_t *slot) {
     slot->age = 0;
 }
 
+/**
+ * Purpose: Implements on drop removed.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - slot (const drop_slot_t *): Input argument used by this routine.
+ *   - scavenged (bool): Boolean flag controlling conditional behavior.
+ */
 static void on_drop_removed(game_t *game, const drop_slot_t *slot, bool scavenged) {
     if (!slot->occupied || slot->kind != DROP_KIND_CART) {
         return;
@@ -171,6 +206,17 @@ static void on_drop_removed(game_t *game, const drop_slot_t *slot, bool scavenge
     }
 }
 
+/**
+ * Purpose: Implements world place drop.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - kind (drop_kind_t): Input argument used by this routine.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 static bool world_place_drop(game_t *game,
                              location_id_t location,
                              drop_kind_t kind,
@@ -228,6 +274,12 @@ static bool world_place_drop(game_t *game,
     return true;
 }
 
+/**
+ * Purpose: Implements world note drops.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ */
 static void world_note_drops(game_t *game, location_id_t location) {
     int count = world_visible_drop_count(game, location);
     if (count > 0) {
@@ -235,6 +287,11 @@ static void world_note_drops(game_t *game, location_id_t location) {
     }
 }
 
+/**
+ * Purpose: Implements world autosave.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 static void world_autosave(game_t *game) {
     char error[128];
 
@@ -243,6 +300,13 @@ static void world_autosave(game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements world arrive.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - travelled (bool): Boolean flag controlling conditional behavior.
+ */
 void world_arrive(game_t *game, location_id_t location, bool travelled) {
     game->player.location = location;
     if (market_has_open_market(location)) {
@@ -255,6 +319,14 @@ void world_arrive(game_t *game, location_id_t location, bool travelled) {
     world_autosave(game);
 }
 
+/**
+ * Purpose: Implements world travel.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - destination (location_id_t): Location identifier used to select travel or market context.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool world_travel(game_t *game, location_id_t destination) {
     location_id_t origin = game->player.location;
 
@@ -274,6 +346,11 @@ bool world_travel(game_t *game, location_id_t destination) {
     return true;
 }
 
+/**
+ * Purpose: Implements world rest.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void world_rest(game_t *game) {
     if (LOCATIONS[game->player.location].kind != LOCATION_KIND_WILDERNESS) {
         game_log(game, "You can only sleep rough in the wilderness.");
@@ -290,6 +367,13 @@ void world_rest(game_t *game) {
     game_log(game, "You sleep rough and recover 1 HP.");
 }
 
+/**
+ * Purpose: Implements world pay impound.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool world_pay_impound(game_t *game) {
     if (game->player.location != LOCATION_STARPORT) {
         game_log(game, "You can only pay the impound fee at Starport.");
@@ -307,6 +391,11 @@ bool world_pay_impound(game_t *game) {
     return true;
 }
 
+/**
+ * Purpose: Implements world decay drops.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void world_decay_drops(game_t *game) {
     for (int location = 0; location < MAX_LOCATIONS; ++location) {
         if ((location_id_t)location == game->player.location) {
@@ -326,10 +415,28 @@ void world_decay_drops(game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements world drop commodity.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool world_drop_commodity(game_t *game, location_id_t location, commodity_id_t commodity, int quantity) {
     return world_place_drop(game, location, DROP_KIND_COMMODITY, commodity, quantity);
 }
 
+/**
+ * Purpose: Implements world drop cart.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool world_drop_cart(game_t *game, location_id_t location) {
     bool dropped = world_place_drop(game, location, DROP_KIND_CART, COMMODITY_FOOD_RATIONS, 1);
 
@@ -339,6 +446,15 @@ bool world_drop_cart(game_t *game, location_id_t location) {
     return dropped;
 }
 
+/**
+ * Purpose: Implements world pickup drop.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - slot_index (int): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool world_pickup_drop(game_t *game, location_id_t location, int slot_index) {
     drop_slot_t *slot;
 
@@ -376,6 +492,14 @@ bool world_pickup_drop(game_t *game, location_id_t location, int slot_index) {
     return true;
 }
 
+/**
+ * Purpose: Implements world visible drop count.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int world_visible_drop_count(const game_t *game, location_id_t location) {
     int count = 0;
 
@@ -387,6 +511,15 @@ int world_visible_drop_count(const game_t *game, location_id_t location) {
     return count;
 }
 
+/**
+ * Purpose: Implements spill excess cargo.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - target_capacity_tenths (int): Input argument used by this routine.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int spill_excess_cargo(game_t *game, location_id_t location, int target_capacity_tenths) {
     int spilled_tenths = 0;
 
@@ -412,6 +545,11 @@ static int spill_excess_cargo(game_t *game, location_id_t location, int target_c
     return spilled_tenths;
 }
 
+/**
+ * Purpose: Implements world handle mule death.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void world_handle_mule_death(game_t *game) {
     location_id_t location = game->player.location;
     bool had_cart = game->player.has_cart;

@@ -1,0 +1,59 @@
+.TH SPACETRADER 6 "June 2026" "spacetrader" "Games"
+.SH NAME
+spacetrader \- terminal trading and survival game
+.SH SYNOPSIS
+.B spacetrader
+.SH DESCRIPTION
+.B spacetrader
+is an ncurses-based trading game set on an outlying colony world, Kepler's Reach.
+Travel between locations, buy and sell goods, manage cargo, survive encounters,
+and try to earn enough credits to get your starship out of the impound lot.
+.PP
+The game runs in a terminal and expects at least an 80x24 display.
+.SH CONTROLS
+.SS Title screen
+.TP
+.B N
+Start a new game.
+.TP
+.B L
+Load a saved game.
+.TP
+.B Q
+Quit.
+.SS Location view (main loop)
+.TP
+.B 1-4
+Travel using numbered routes.
+.TP
+.B M / S / B / H / C / N / P / R / I / G / X / V / Q
+Context-sensitive actions (market, store, bar, healing, notice board,
+prospecting, rest, inventory, ground items, pay impound, save, quit).
+.PP
+Additional controls are shown in the command strip for each menu and encounter.
+.SH FILES
+.TP
+.I ~/.spacetrader.sav
+Primary save file.
+.TP
+.I ~/.spacetrader.sav.bak
+Backup created when a save is unreadable, has a checksum failure, or version mismatch.
+.TP
+.I ~/.spacetrader.scores
+Persistent high-score table.
+.SH SCORING
+Score entries are recorded on victory or death.
+.PP
+Current score formula:
+.PP
+.I score = credits + cargo_value + (turns * 10)
+.SH EXIT STATUS
+.TP
+.B 0
+Game exited normally.
+.SH AUTHORS
+Michael Jackson (michael.o.jackson@gmail.com)
+.SH LICENSE
+BSD 3-Clause, see LICENSE for details.
+.SH SEE ALSO
+.BR ncurses (3X)

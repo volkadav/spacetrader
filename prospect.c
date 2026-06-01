@@ -1,9 +1,19 @@
+/* prospect.c: Prospecting action resolution, finds, hazards, and related event hooks. */
 #include "prospect.h"
 
 #include "encounter.h"
 #include "player.h"
 #include "util.h"
 
+/**
+ * Purpose: Implements award find.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 static bool award_find(game_t *game, commodity_id_t commodity, int quantity) {
     if (!player_add_cargo(&game->player, commodity, quantity)) {
         game_log(game, "You find %d x %s but cannot carry it.", quantity, COMMODITIES[commodity].name);
@@ -13,6 +23,13 @@ static bool award_find(game_t *game, commodity_id_t commodity, int quantity) {
     return true;
 }
 
+/**
+ * Purpose: Implements common pick.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - commodity_id_t: Return value describing the outcome of this routine.
+ */
 static commodity_id_t common_pick(game_t *game) {
     switch (game->player.location) {
     case LOCATION_BARRENS:
@@ -24,6 +41,13 @@ static commodity_id_t common_pick(game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements useful pick.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - commodity_id_t: Return value describing the outcome of this routine.
+ */
 static commodity_id_t useful_pick(game_t *game) {
     switch (game->player.location) {
     case LOCATION_DUSTWALLOW:
@@ -39,6 +63,11 @@ static commodity_id_t useful_pick(game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements prospect run.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void prospect_run(game_t *game) {
     int bonus;
     int roll;

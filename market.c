@@ -1,3 +1,4 @@
+/* market.c: Commodity catalog, dynamic pricing, market refresh, and buy/sell operations. */
 #include "market.h"
 
 #include <stdio.h>
@@ -54,6 +55,13 @@ static const int BASELINE_STOCKS[MAX_LOCATIONS][NUM_COMMODITIES] = {
     [LOCATION_COLDWATER] = {7, 7, 0, 5, 3, 0, 3, 2, 4, 6, 3, 2, 1, 0, 0}
 };
 
+/**
+ * Purpose: Implements stock price factor.
+ * Parameters:
+ *   - stock (int): Input argument used by this routine.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int stock_price_factor(int stock) {
     if (stock <= 0) {
         return 180;
@@ -79,6 +87,16 @@ static int stock_price_factor(int stock) {
     return 70;
 }
 
+/**
+ * Purpose: Implements refresh price.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - stock (int): Input argument used by this routine.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int refresh_price(game_t *game, location_id_t location, commodity_id_t commodity, int stock) {
     int price = COMMODITIES[commodity].base_price;
     int jitter = rng_range(game, 90, 110);
@@ -89,10 +107,26 @@ static int refresh_price(game_t *game, location_id_t location, commodity_id_t co
     return clamp_int(price, 1, 100000);
 }
 
+/**
+ * Purpose: Implements is legal for discount.
+ * Parameters:
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 static bool is_legal_for_discount(commodity_id_t commodity) {
     return COMMODITIES[commodity].legal;
 }
 
+/**
+ * Purpose: Implements apply reputation discount.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - price (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int apply_reputation_discount(const game_t *game, commodity_id_t commodity, int price) {
     if (game->player.reputation >= 2 && is_legal_for_discount(commodity)) {
         return (price * 95) / 100;
@@ -100,6 +134,11 @@ static int apply_reputation_discount(const game_t *game, commodity_id_t commodit
     return price;
 }
 
+/**
+ * Purpose: Implements market init all.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void market_init_all(game_t *game) {
     memset(game->markets, 0, sizeof(game->markets));
     for (int location = 0; location < MAX_LOCATIONS; ++location) {
@@ -113,10 +152,24 @@ void market_init_all(game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements market has open market.
+ * Parameters:
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool market_has_open_market(location_id_t location) {
     return LOCATIONS[location].kind != LOCATION_KIND_WILDERNESS;
 }
 
+/**
+ * Purpose: Implements market refresh location.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - force (bool): Boolean flag controlling conditional behavior.
+ */
 void market_refresh_location(game_t *game, location_id_t location, bool force) {
     market_state_t *market = &game->markets[location];
 
@@ -152,6 +205,14 @@ void market_refresh_location(game_t *game, location_id_t location, bool force) {
     market->last_refresh_turn = game->turn;
 }
 
+/**
+ * Purpose: Implements market can buy openly.
+ * Parameters:
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool market_can_buy_openly(location_id_t location, commodity_id_t commodity) {
     if (!market_has_open_market(location)) {
         return false;
@@ -162,6 +223,14 @@ bool market_can_buy_openly(location_id_t location, commodity_id_t commodity) {
     return commodity != COMMODITY_ARTIFACTS;
 }
 
+/**
+ * Purpose: Implements market can sell openly.
+ * Parameters:
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool market_can_sell_openly(location_id_t location, commodity_id_t commodity) {
     if (!market_has_open_market(location)) {
         return false;
@@ -175,10 +244,28 @@ bool market_can_sell_openly(location_id_t location, commodity_id_t commodity) {
     return true;
 }
 
+/**
+ * Purpose: Implements market buy price.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int market_buy_price(const game_t *game, location_id_t location, commodity_id_t commodity) {
     return apply_reputation_discount(game, commodity, game->markets[location].prices[commodity]);
 }
 
+/**
+ * Purpose: Implements market sell price.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int market_sell_price(const game_t *game, location_id_t location, commodity_id_t commodity) {
     if (commodity == COMMODITY_ARTIFACTS && location == LOCATION_STARPORT) {
         return (game->markets[location].prices[commodity] * 90) / 100;
@@ -186,10 +273,27 @@ int market_sell_price(const game_t *game, location_id_t location, commodity_id_t
     return game->markets[location].prices[commodity];
 }
 
+/**
+ * Purpose: Implements market fence price.
+ * Parameters:
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int market_fence_price(commodity_id_t commodity) {
     return (COMMODITIES[commodity].base_price * 70) / 100;
 }
 
+/**
+ * Purpose: Implements market buy.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool market_buy(game_t *game, location_id_t location, commodity_id_t commodity, int quantity) {
     market_state_t *market = &game->markets[location];
     int total_price = market_buy_price(game, location, commodity) * quantity;
@@ -217,6 +321,16 @@ bool market_buy(game_t *game, location_id_t location, commodity_id_t commodity, 
     return true;
 }
 
+/**
+ * Purpose: Implements market sell.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool market_sell(game_t *game, location_id_t location, commodity_id_t commodity, int quantity) {
     market_state_t *market = &game->markets[location];
     int total_price = market_sell_price(game, location, commodity) * quantity;
@@ -236,6 +350,13 @@ bool market_sell(game_t *game, location_id_t location, commodity_id_t commodity,
     return true;
 }
 
+/**
+ * Purpose: Implements market generate rumour.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - buffer (char *): Output buffer populated by this routine.
+ *   - buffer_size (size_t): Output buffer populated by this routine.
+ */
 void market_generate_rumour(game_t *game, char *buffer, size_t buffer_size) {
     int best_location = -1;
     int best_commodity = -1;
@@ -270,13 +391,21 @@ void market_generate_rumour(game_t *game, char *buffer, size_t buffer_size) {
 
     snprintf(buffer,
              buffer_size,
-             "%s is %s on %s %s.",
+             "%s is %s %s %s %s.",
              LOCATIONS[best_location].name,
              shortage ? "hungry" : "flush",
+             shortage ? "for" : "on",
              COMMODITIES[best_commodity].name,
              shortage ? "right now" : "for the moment");
 }
 
+/**
+ * Purpose: Implements market estimate cargo value.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int market_estimate_cargo_value(const game_t *game) {
     int total = 0;
 

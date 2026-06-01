@@ -1,3 +1,4 @@
+/* combat.h: Combat-related enemy definitions and the public combat execution entry point. */
 #ifndef SPACE_TRADER_COMBAT_H
 #define SPACE_TRADER_COMBAT_H
 

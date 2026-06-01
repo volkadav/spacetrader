@@ -1,3 +1,4 @@
+/* encounter.h: Public hooks for triggering travel, wilderness, and bar encounter events. */
 #ifndef SPACE_TRADER_ENCOUNTER_H
 #define SPACE_TRADER_ENCOUNTER_H
 

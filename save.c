@@ -1,3 +1,4 @@
+/* save.c: Save/load serialization, corrupt-save handling, and persistent high-score storage. */
 #include "save.h"
 
 #include <stdio.h>
@@ -28,14 +29,40 @@ typedef struct {
     high_score_t scores[MAX_HIGH_SCORES];
 } score_blob_t;
 
+/**
+ * Purpose: Implements score value.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int score_value(const game_t *game) {
     return game->player.credits + market_estimate_cargo_value(game) + (game->turn * 10);
 }
 
+/**
+ * Purpose: Implements append suffix.
+ * Parameters:
+ *   - path (const char *): Input argument used by this routine.
+ *   - suffix (const char *): Input argument used by this routine.
+ *   - buffer (char *): Output buffer populated by this routine.
+ *   - buffer_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 static bool append_suffix(const char *path, const char *suffix, char *buffer, size_t buffer_size) {
     return snprintf(buffer, buffer_size, "%s%s", path, suffix) < (int)buffer_size;
 }
 
+/**
+ * Purpose: Implements archive corrupt save.
+ * Parameters:
+ *   - save_path (const char *): Input argument used by this routine.
+ *   - backup_path (char *): Input argument used by this routine.
+ *   - backup_path_size (size_t): Capacity value, typically in bytes, for the associated buffer or container.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 static bool archive_corrupt_save(const char *save_path, char *backup_path, size_t backup_path_size) {
     if (!append_suffix(save_path, ".bak", backup_path, backup_path_size)) {
         return false;
@@ -45,6 +72,15 @@ static bool archive_corrupt_save(const char *save_path, char *backup_path, size_
     return rename(save_path, backup_path) == 0;
 }
 
+/**
+ * Purpose: Implements save game.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - error_buffer (char *): Output buffer populated by this routine.
+ *   - error_buffer_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size) {
     char path[512];
     FILE *fp;
@@ -76,6 +112,15 @@ bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size)
     return true;
 }
 
+/**
+ * Purpose: Implements load game.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - error_buffer (char *): Output buffer populated by this routine.
+ *   - error_buffer_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - save_load_result_t: Return value describing the outcome of this routine.
+ */
 save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buffer_size) {
     char path[512];
     char backup_path[540];
@@ -128,6 +173,11 @@ save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buff
     return SAVE_LOAD_OK;
 }
 
+/**
+ * Purpose: Implements load high scores.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void load_high_scores(game_t *game) {
     char path[512];
     FILE *fp;
@@ -156,6 +206,12 @@ void load_high_scores(game_t *game) {
     memcpy(game->scores, blob.scores, sizeof(blob.scores));
 }
 
+/**
+ * Purpose: Implements record high score.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - outcome (const char *): Text input used for display, messaging, or formatting.
+ */
 void record_high_score(game_t *game, const char *outcome) {
     char path[512];
     FILE *fp;
@@ -175,6 +231,19 @@ void record_high_score(game_t *game, const char *outcome) {
     entry.cargo_value = market_estimate_cargo_value(game);
     entry.turns = game->turn;
     entry.score = score_value(game);
+
+    if (game->score_count < 0) {
+        game->score_count = 0;
+    } else if (game->score_count > MAX_HIGH_SCORES) {
+        game->score_count = MAX_HIGH_SCORES;
+    }
+
+    for (int i = 0; i < game->score_count; ++i) {
+        if (game->scores[i].score == entry.score && strcmp(game->scores[i].name, entry.name) == 0) {
+            game->score_recorded = true;
+            return;
+        }
+    }
 
     for (int i = 0; i < game->score_count; ++i) {
         if (entry.score > game->scores[i].score) {

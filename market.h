@@ -1,3 +1,4 @@
+/* market.h: Commodity market refresh, pricing, trade operations, and rumor generation APIs. */
 #ifndef SPACE_TRADER_MARKET_H
 #define SPACE_TRADER_MARKET_H
 

@@ -1,3 +1,4 @@
+/* save.h: Save/load result types and persistence APIs for game and high-score data. */
 #ifndef SPACE_TRADER_SAVE_H
 #define SPACE_TRADER_SAVE_H
 

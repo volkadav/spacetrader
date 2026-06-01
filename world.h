@@ -1,3 +1,4 @@
+/* world.h: APIs for world navigation, arrival effects, and persistent ground drops. */
 #ifndef SPACE_TRADER_WORLD_H
 #define SPACE_TRADER_WORLD_H
 

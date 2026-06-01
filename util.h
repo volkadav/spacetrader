@@ -1,3 +1,4 @@
+/* util.h: Declarations for shared helpers (RNG, logging, checksums, and path utilities). */
 #ifndef SPACE_TRADER_UTIL_H
 #define SPACE_TRADER_UTIL_H
 

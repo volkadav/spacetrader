@@ -1,3 +1,4 @@
+/* combat.c: Enemy definitions and the turn-based combat flow, rewards, and outcomes. */
 #include "combat.h"
 
 #include <ncurses.h>
@@ -17,6 +18,16 @@ const enemy_t ENEMIES[ENEMY_COUNT] = {
     [ENEMY_BAR_BRAWLER] = {"Bar Brawler", 8, 0, 1, 0, 25, false, 10, 50}
 };
 
+/**
+ * Purpose: Implements draw combat screen.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - enemy (const enemy_t *): Input argument used by this routine.
+ *   - enemy_hp (int): Input argument used by this routine.
+ *   - mule_hp (int): Input argument used by this routine.
+ *   - mule_has_cart (bool): Boolean flag controlling conditional behavior.
+ *   - title (const char *): Text input used for display, messaging, or formatting.
+ */
 static void draw_combat_screen(const game_t *game,
                                const enemy_t *enemy,
                                int enemy_hp,
@@ -60,6 +71,15 @@ static void draw_combat_screen(const game_t *game,
     refresh();
 }
 
+/**
+ * Purpose: Implements combat run.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - enemy_id (enemy_id_t): Identifier selecting the target entity for this operation.
+ *   - title (const char *): Text input used for display, messaging, or formatting.
+ * Returns:
+ *   - combat_result_t: Return value describing the outcome of this routine.
+ */
 combat_result_t combat_run(game_t *game, enemy_id_t enemy_id, const char *title) {
     const enemy_t *enemy = &ENEMIES[enemy_id];
     int enemy_hp = enemy->max_hp;

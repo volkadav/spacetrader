@@ -1,3 +1,4 @@
+/* gamble.h: Types and function declarations for blackjack and roulette subsystems. */
 #ifndef SPACE_TRADER_GAMBLE_H
 #define SPACE_TRADER_GAMBLE_H
 

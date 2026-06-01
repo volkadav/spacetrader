@@ -1,3 +1,4 @@
+/* util.c: Shared utility helpers for RNG, logging, checksums, and path handling. */
 #include "util.h"
 
 #include <stdarg.h>
@@ -11,6 +12,15 @@
 #include "player.h"
 #include "world.h"
 
+/**
+ * Purpose: Implements clamp int.
+ * Parameters:
+ *   - value (int): Numeric input used by this routine for calculations or limits.
+ *   - min_value (int): Numeric input used by this routine for calculations or limits.
+ *   - max_value (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int clamp_int(int value, int min_value, int max_value) {
     if (value < min_value) {
         return min_value;
@@ -21,6 +31,13 @@ int clamp_int(int value, int min_value, int max_value) {
     return value;
 }
 
+/**
+ * Purpose: Implements rng next.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - uint32_t: Computed numeric result for this routine.
+ */
 uint32_t rng_next(game_t *game) {
     uint32_t x = game->rng_state;
     if (x == 0) {
@@ -33,15 +50,39 @@ uint32_t rng_next(game_t *game) {
     return x;
 }
 
+/**
+ * Purpose: Implements rng range.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - min_value (int): Numeric input used by this routine for calculations or limits.
+ *   - max_value (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int rng_range(game_t *game, int min_value, int max_value) {
     uint32_t span = (uint32_t)(max_value - min_value + 1);
     return min_value + (int)(rng_next(game) % span);
 }
 
+/**
+ * Purpose: Implements rng chance.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - percent (int): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool rng_chance(game_t *game, int percent) {
     return rng_range(game, 1, 100) <= percent;
 }
 
+/**
+ * Purpose: Implements game log.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - fmt (const char *): Text input used for display, messaging, or formatting.
+ *   - ... (...): Additional variadic arguments consumed by the format logic.
+ */
 void game_log(game_t *game, const char *fmt, ...) {
     va_list args;
     char *line = game->log.text[game->log.head];
@@ -56,6 +97,12 @@ void game_log(game_t *game, const char *fmt, ...) {
     }
 }
 
+/**
+ * Purpose: Implements game set game over.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - reason (const char *): Text input used for display, messaging, or formatting.
+ */
 void game_set_game_over(game_t *game, const char *reason) {
     game->state = GAME_STATE_GAME_OVER;
     game->player.hp = 0;
@@ -63,11 +110,21 @@ void game_set_game_over(game_t *game, const char *reason) {
     game_log(game, "%s", reason);
 }
 
+/**
+ * Purpose: Implements game advance turn.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void game_advance_turn(game_t *game) {
     game->turn++;
     world_decay_drops(game);
 }
 
+/**
+ * Purpose: Implements game init new.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void game_init_new(game_t *game) {
     high_score_t old_scores[MAX_HIGH_SCORES];
     int old_score_count = game->score_count;
@@ -89,6 +146,11 @@ void game_init_new(game_t *game) {
 static uint32_t crc32_table[256];
 static bool crc32_table_ready = false;
 
+/**
+ * Purpose: Implements crc32 init.
+ * Parameters:
+ *   - None.
+ */
 static void crc32_init(void) {
     if (crc32_table_ready) {
         return;
@@ -109,6 +171,14 @@ static void crc32_init(void) {
     crc32_table_ready = true;
 }
 
+/**
+ * Purpose: Implements crc32 bytes.
+ * Parameters:
+ *   - data (const void *): Input argument used by this routine.
+ *   - length (size_t): Input argument used by this routine.
+ * Returns:
+ *   - uint32_t: Computed numeric result for this routine.
+ */
 uint32_t crc32_bytes(const void *data, size_t length) {
     const unsigned char *bytes = (const unsigned char *)data;
     uint32_t crc = 0xffffffffu;
@@ -120,6 +190,15 @@ uint32_t crc32_bytes(const void *data, size_t length) {
     return crc ^ 0xffffffffu;
 }
 
+/**
+ * Purpose: Implements home file path.
+ * Parameters:
+ *   - filename (const char *): Input argument used by this routine.
+ *   - buffer (char *): Output buffer populated by this routine.
+ *   - buffer_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool home_file_path(const char *filename, char *buffer, size_t buffer_size) {
     const char *home = getenv("HOME");
 

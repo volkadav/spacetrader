@@ -1,13 +1,28 @@
+/* gamble.c: Blackjack and roulette mechanics used by bar gambling menus. */
 #include "gamble.h"
 
 #include <stdio.h>
 
 #include "util.h"
 
+/**
+ * Purpose: Implements gamble draw card.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int gamble_draw_card(game_t *game) {
     return rng_range(game, 0, 51);
 }
 
+/**
+ * Purpose: Implements gamble format card.
+ * Parameters:
+ *   - card (int): Input argument used by this routine.
+ *   - buffer (char *): Output buffer populated by this routine.
+ *   - buffer_size (size_t): Output buffer populated by this routine.
+ */
 void gamble_format_card(int card, char *buffer, size_t buffer_size) {
     static const char *RANKS[] = {
         "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"
@@ -30,6 +45,15 @@ void gamble_format_card(int card, char *buffer, size_t buffer_size) {
     snprintf(buffer, buffer_size, "%s%c", RANKS[rank], SUITS[suit]);
 }
 
+/**
+ * Purpose: Implements gamble blackjack value.
+ * Parameters:
+ *   - cards (const int *): Input argument used by this routine.
+ *   - card_count (int): Numeric input used by this routine for calculations or limits.
+ *   - soft (bool *): Input argument used by this routine.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int gamble_blackjack_value(const int *cards, int card_count, bool *soft) {
     int total = 0;
     int aces = 0;
@@ -60,18 +84,48 @@ int gamble_blackjack_value(const int *cards, int card_count, bool *soft) {
     return total;
 }
 
+/**
+ * Purpose: Implements gamble blackjack is natural.
+ * Parameters:
+ *   - cards (const int *): Input argument used by this routine.
+ *   - card_count (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool gamble_blackjack_is_natural(const int *cards, int card_count) {
     return card_count == 2 && gamble_blackjack_value(cards, card_count, NULL) == 21;
 }
 
+/**
+ * Purpose: Implements gamble blackjack can double.
+ * Parameters:
+ *   - card_count (int): Numeric input used by this routine for calculations or limits.
+ *   - first_action (bool): Boolean flag controlling conditional behavior.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool gamble_blackjack_can_double(int card_count, bool first_action) {
     return first_action && card_count == 2;
 }
 
+/**
+ * Purpose: Implements gamble roulette spin.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int gamble_roulette_spin(game_t *game) {
     return rng_range(game, 0, 36);
 }
 
+/**
+ * Purpose: Implements gamble roulette is red.
+ * Parameters:
+ *   - number (int): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool gamble_roulette_is_red(int number) {
     switch (number) {
     case 1:
@@ -98,10 +152,25 @@ bool gamble_roulette_is_red(int number) {
     }
 }
 
+/**
+ * Purpose: Implements roulette is black.
+ * Parameters:
+ *   - number (int): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 static bool roulette_is_black(int number) {
     return number != 0 && !gamble_roulette_is_red(number);
 }
 
+/**
+ * Purpose: Implements gamble roulette bet wins.
+ * Parameters:
+ *   - bet (const roulette_bet_t *): Input argument used by this routine.
+ *   - number (int): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool gamble_roulette_bet_wins(const roulette_bet_t *bet, int number) {
     if (bet == NULL || number < 0 || number > 36) {
         return false;
@@ -149,6 +218,13 @@ bool gamble_roulette_bet_wins(const roulette_bet_t *bet, int number) {
     }
 }
 
+/**
+ * Purpose: Implements gamble roulette profit multiplier.
+ * Parameters:
+ *   - bet (const roulette_bet_t *): Input argument used by this routine.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int gamble_roulette_profit_multiplier(const roulette_bet_t *bet) {
     if (bet == NULL) {
         return 0;
@@ -169,6 +245,13 @@ int gamble_roulette_profit_multiplier(const roulette_bet_t *bet) {
     }
 }
 
+/**
+ * Purpose: Implements gamble roulette describe bet.
+ * Parameters:
+ *   - bet (const roulette_bet_t *): Input argument used by this routine.
+ *   - buffer (char *): Output buffer populated by this routine.
+ *   - buffer_size (size_t): Output buffer populated by this routine.
+ */
 void gamble_roulette_describe_bet(const roulette_bet_t *bet, char *buffer, size_t buffer_size) {
     if (buffer_size == 0) {
         return;

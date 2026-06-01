@@ -1,3 +1,4 @@
+/* game.h: Core game data model, constants, enums, and shared state structures. */
 #ifndef SPACE_TRADER_GAME_H
 #define SPACE_TRADER_GAME_H
 

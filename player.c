@@ -1,3 +1,4 @@
+/* player.c: Player state, cargo management, and purchasable equipment/shop item logic. */
 #include "player.h"
 
 #include <string.h>
@@ -43,6 +44,11 @@ const shop_item_def_t SHOP_ITEMS[SHOP_ITEM_COUNT] = {
     [SHOP_ITEM_COMBAT_ARMOR] = {"Combat Armor", SHOP_KIND_ARMOR, 900, "DR 5, -10 flee"}
 };
 
+/**
+ * Purpose: Implements compact cargo.
+ * Parameters:
+ *   - player (player_t *): Player state used for this operation.
+ */
 static void compact_cargo(player_t *player) {
     int write_index = 0;
 
@@ -57,6 +63,14 @@ static void compact_cargo(player_t *player) {
     player->cargo_count = write_index;
 }
 
+/**
+ * Purpose: Implements discount price.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - price (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int discount_price(const game_t *game, int price) {
     if (game->player.reputation >= 2) {
         return (price * 95) / 100;
@@ -64,6 +78,11 @@ static int discount_price(const game_t *game, int price) {
     return price;
 }
 
+/**
+ * Purpose: Implements player init.
+ * Parameters:
+ *   - player (player_t *): Player state used for this operation.
+ */
 void player_init(player_t *player) {
     memset(player, 0, sizeof(*player));
     player->hp = 10;
@@ -74,6 +93,13 @@ void player_init(player_t *player) {
     player->armor = ARMOR_NONE;
 }
 
+/**
+ * Purpose: Implements player cargo capacity tenths.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int player_cargo_capacity_tenths(const player_t *player) {
     int capacity = player->has_sturdy_pack ? 200 : 100;
 
@@ -86,6 +112,13 @@ int player_cargo_capacity_tenths(const player_t *player) {
     return capacity;
 }
 
+/**
+ * Purpose: Implements player cargo used tenths.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int player_cargo_used_tenths(const player_t *player) {
     int total = 0;
 
@@ -95,6 +128,14 @@ int player_cargo_used_tenths(const player_t *player) {
     return total;
 }
 
+/**
+ * Purpose: Implements player cargo quantity.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int player_cargo_quantity(const player_t *player, commodity_id_t commodity) {
     for (int i = 0; i < player->cargo_count; ++i) {
         if (player->cargo[i].commodity == commodity) {
@@ -104,11 +145,29 @@ int player_cargo_quantity(const player_t *player, commodity_id_t commodity) {
     return 0;
 }
 
+/**
+ * Purpose: Implements player has space for.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_has_space_for(const player_t *player, commodity_id_t commodity, int quantity) {
     int needed = COMMODITIES[commodity].units_tenths * quantity;
     return player_cargo_used_tenths(player) + needed <= player_cargo_capacity_tenths(player);
 }
 
+/**
+ * Purpose: Implements player add cargo.
+ * Parameters:
+ *   - player (player_t *): Player state used for this operation.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_add_cargo(player_t *player, commodity_id_t commodity, int quantity) {
     if (!player_has_space_for(player, commodity, quantity)) {
         return false;
@@ -131,6 +190,15 @@ bool player_add_cargo(player_t *player, commodity_id_t commodity, int quantity) 
     return true;
 }
 
+/**
+ * Purpose: Implements player remove cargo.
+ * Parameters:
+ *   - player (player_t *): Player state used for this operation.
+ *   - commodity (commodity_id_t): Commodity identifier to inspect, add, remove, or price.
+ *   - quantity (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_remove_cargo(player_t *player, commodity_id_t commodity, int quantity) {
     for (int i = 0; i < player->cargo_count; ++i) {
         if (player->cargo[i].commodity == commodity) {
@@ -145,10 +213,23 @@ bool player_remove_cargo(player_t *player, commodity_id_t commodity, int quantit
     return false;
 }
 
+/**
+ * Purpose: Implements player heal.
+ * Parameters:
+ *   - player (player_t *): Player state used for this operation.
+ *   - amount (int): Numeric input used by this routine for calculations or limits.
+ */
 void player_heal(player_t *player, int amount) {
     player->hp = clamp_int(player->hp + amount, 0, player->max_hp);
 }
 
+/**
+ * Purpose: Implements player use bandage.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_use_bandage(game_t *game) {
     if (game->player.bandages <= 0) {
         game_log(game, "You do not have a bandage.");
@@ -170,6 +251,13 @@ bool player_use_bandage(game_t *game) {
     return true;
 }
 
+/**
+ * Purpose: Implements player use medkit.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_use_medkit(game_t *game) {
     if (game->player.medkit_uses <= 0) {
         game_log(game, "Your medkit is empty.");
@@ -191,18 +279,47 @@ bool player_use_medkit(game_t *game) {
     return true;
 }
 
+/**
+ * Purpose: Implements player weapon damage.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int player_weapon_damage(const player_t *player) {
     return WEAPONS[player->weapon].damage;
 }
 
+/**
+ * Purpose: Implements player armor dr.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int player_armor_dr(const player_t *player) {
     return ARMORS[player->armor].dr;
 }
 
+/**
+ * Purpose: Implements player flee penalty.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 int player_flee_penalty(const player_t *player) {
     return ARMORS[player->armor].flee_penalty;
 }
 
+/**
+ * Purpose: Implements player can offer shop item.
+ * Parameters:
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - item (shop_item_id_t): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_can_offer_shop_item(location_id_t location, shop_item_id_t item) {
     if (LOCATIONS[location].kind == LOCATION_KIND_WILDERNESS) {
         return false;
@@ -213,6 +330,14 @@ bool player_can_offer_shop_item(location_id_t location, shop_item_id_t item) {
     return true;
 }
 
+/**
+ * Purpose: Implements player owns shop item.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ *   - item (shop_item_id_t): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_owns_shop_item(const player_t *player, shop_item_id_t item) {
     switch (item) {
     case SHOP_ITEM_PROSPECTING_KIT:
@@ -252,6 +377,14 @@ bool player_owns_shop_item(const player_t *player, shop_item_id_t item) {
     }
 }
 
+/**
+ * Purpose: Implements player buy shop item.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - item (shop_item_id_t): Input argument used by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
 bool player_buy_shop_item(game_t *game, shop_item_id_t item) {
     int price = discount_price(game, SHOP_ITEMS[item].cost);
 

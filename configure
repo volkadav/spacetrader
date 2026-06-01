@@ -1,0 +1,84 @@
+#!/bin/sh
+
+set -eu
+
+CC=${CC:-cc}
+CFLAGS=${CFLAGS:-"-std=c99 -Wall -Wextra -Wpedantic -O2 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600"}
+CPPFLAGS=${CPPFLAGS:-}
+LDFLAGS=${LDFLAGS:-}
+PKG_CONFIG=${PKG_CONFIG:-pkg-config}
+NCURSES_CFLAGS=${NCURSES_CFLAGS:-}
+NCURSES_LIBS=${NCURSES_LIBS:-}
+
+escape_sed() {
+    printf '%s' "$1" | sed 's/[\/&]/\\&/g'
+}
+
+check_curses_link() {
+    cflags="$1"
+    libs="$2"
+
+    cat > conftest.c <<'EOF'
+#include <ncurses.h>
+int main(void) {
+    initscr();
+    endwin();
+    return 0;
+}
+EOF
+
+    if "$CC" $CFLAGS $CPPFLAGS $cflags conftest.c $LDFLAGS $libs -o conftest >/dev/null 2>&1; then
+        rm -f conftest.c conftest
+        return 0
+    fi
+
+    rm -f conftest.c conftest
+    return 1
+}
+
+if [ -z "$NCURSES_LIBS" ] && command -v "$PKG_CONFIG" >/dev/null 2>&1; then
+    for pkg in ncursesw ncurses curses; do
+        if "$PKG_CONFIG" --exists "$pkg" >/dev/null 2>&1; then
+            NCURSES_CFLAGS=$("$PKG_CONFIG" --cflags "$pkg")
+            NCURSES_LIBS=$("$PKG_CONFIG" --libs "$pkg")
+            break
+        fi
+    done
+fi
+
+if [ -z "$NCURSES_LIBS" ]; then
+    for cflags_try in "" "-I/usr/local/include" "-I/usr/local/include/ncurses"; do
+        for libs_try in "-lncursesw -ltinfo" "-lncursesw" "-lncurses -ltinfo" "-lncurses" "-lcurses"; do
+            if check_curses_link "$cflags_try" "$libs_try"; then
+                NCURSES_CFLAGS=$cflags_try
+                NCURSES_LIBS=$libs_try
+                break 2
+            fi
+        done
+    done
+fi
+
+if [ -z "$NCURSES_LIBS" ]; then
+    echo "configure: error: could not find a working curses configuration." >&2
+    echo "configure: hint: set NCURSES_CFLAGS/NCURSES_LIBS explicitly." >&2
+    exit 1
+fi
+
+sed \
+    -e "s/@CC@/$(escape_sed "$CC")/" \
+    -e "s/@CFLAGS@/$(escape_sed "$CFLAGS")/" \
+    -e "s/@CPPFLAGS@/$(escape_sed "$CPPFLAGS")/" \
+    -e "s/@LDFLAGS@/$(escape_sed "$LDFLAGS")/" \
+    -e "s/@NCURSES_CFLAGS@/$(escape_sed "$NCURSES_CFLAGS")/" \
+    -e "s/@NCURSES_LIBS@/$(escape_sed "$NCURSES_LIBS")/" \
+    Makefile.in > Makefile
+
+echo "Configuration complete."
+echo "  CC=$CC"
+echo "  CFLAGS=$CFLAGS"
+echo "  CPPFLAGS=$CPPFLAGS"
+echo "  LDFLAGS=$LDFLAGS"
+echo "  NCURSES_CFLAGS=$NCURSES_CFLAGS"
+echo "  NCURSES_LIBS=$NCURSES_LIBS"
+echo
+echo "Now run: make"

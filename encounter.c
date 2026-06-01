@@ -1,3 +1,4 @@
+/* encounter.c: Travel, wilderness, and bar encounter events and their branching outcomes. */
 #include "encounter.h"
 
 #include "combat.h"
@@ -6,11 +7,23 @@
 #include "util.h"
 #include "world.h"
 
+/**
+ * Purpose: Implements contraband base value.
+ * Parameters:
+ *   - player (const player_t *): Player state used for this operation.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
 static int contraband_base_value(const player_t *player) {
     return (player_cargo_quantity(player, COMMODITY_NARCOTICS) * COMMODITIES[COMMODITY_NARCOTICS].base_price) +
            (player_cargo_quantity(player, COMMODITY_STOLEN_GOODS) * COMMODITIES[COMMODITY_STOLEN_GOODS].base_price);
 }
 
+/**
+ * Purpose: Implements confiscate contraband.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 static void confiscate_contraband(game_t *game) {
     int base_value = contraband_base_value(&game->player);
     int fine;
@@ -33,6 +46,14 @@ static void confiscate_contraband(game_t *game) {
     game_log(game, "Patrol confiscates contraband and fines you %d cr.", fine);
 }
 
+/**
+ * Purpose: Implements pick wild enemy.
+ * Parameters:
+ *   - location (location_id_t): Location identifier used to select travel or market context.
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ * Returns:
+ *   - enemy_id_t: Return value describing the outcome of this routine.
+ */
 static enemy_id_t pick_wild_enemy(location_id_t location, game_t *game) {
     switch (location) {
     case LOCATION_DUSTWALLOW:
@@ -48,6 +69,11 @@ static enemy_id_t pick_wild_enemy(location_id_t location, game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements grant abandoned cargo.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 static void grant_abandoned_cargo(game_t *game) {
     commodity_id_t commodity;
     int quantity;
@@ -74,12 +100,19 @@ static void grant_abandoned_cargo(game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements encounter on travel.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - from (location_id_t): Location identifier used to select travel or market context.
+ *   - to (location_id_t): Location identifier used to select travel or market context.
+ */
 void encounter_on_travel(game_t *game, location_id_t from, location_id_t to) {
     bool adjacent_to_wilderness = LOCATIONS[from].kind == LOCATION_KIND_WILDERNESS ||
                                   LOCATIONS[to].kind == LOCATION_KIND_WILDERNESS;
 
     if (!rng_chance(game, adjacent_to_wilderness ? 35 : 20)) {
-        game_log(game, "The road to %s is uneventful.", LOCATIONS[to].name);
+        game_log(game, "The trip was uneventful.");
         return;
     }
 
@@ -115,6 +148,11 @@ void encounter_on_travel(game_t *game, location_id_t from, location_id_t to) {
     }
 }
 
+/**
+ * Purpose: Implements encounter on wilderness turn.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void encounter_on_wilderness_turn(game_t *game) {
     int roll;
 
@@ -206,6 +244,11 @@ void encounter_on_wilderness_turn(game_t *game) {
     }
 }
 
+/**
+ * Purpose: Implements encounter on bar entry.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
 void encounter_on_bar_entry(game_t *game) {
     int roll = rng_range(game, 1, 100);
 
