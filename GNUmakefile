@@ -1,0 +1,84 @@
+CC = cc
+CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O2
+CPPFLAGS = 
+LDFLAGS = 
+NCURSES_CFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 
+NCURSES_LIBS = -lncursesw -ltinfo 
+DESTDIR ?=
+BINDIR ?=
+MAN6DIR ?=
+INSTALL ?= install
+RM ?= rm -f
+
+SRC = main.c util.c world.c player.c market.c combat.c encounter.c prospect.c gamble.c save.c ui.c
+OBJ = ${SRC:.c=.o}
+
+.SUFFIXES: .c .o
+
+all: spacetrader
+
+spacetrader: ${OBJ}
+	${CC} ${CFLAGS} ${CPPFLAGS} ${OBJ} ${LDFLAGS} -o $@ ${NCURSES_LIBS}
+
+.c.o:
+	${CC} ${CFLAGS} ${CPPFLAGS} ${NCURSES_CFLAGS} -c $< -o $@
+
+clean:
+	rm -f ${OBJ} spacetrader
+
+install: spacetrader
+	@bindir="${BINDIR}"; \
+	if [ -z "$$bindir" ]; then \
+		if [ -d /usr/local/games ]; then \
+			bindir=/usr/local/games; \
+		elif [ -d /usr/games ]; then \
+			bindir=/usr/games; \
+		else \
+			bindir=/usr/local/bin; \
+		fi; \
+	fi; \
+	man6dir="${MAN6DIR}"; \
+	if [ -z "$$man6dir" ]; then \
+		if [ "$$bindir" = "/usr/games" ]; then \
+			man6dir=/usr/share/man/man6; \
+		else \
+			man6dir=/usr/local/share/man/man6; \
+		fi; \
+	fi; \
+	target_bindir="${DESTDIR}$$bindir"; \
+	target_man6dir="${DESTDIR}$$man6dir"; \
+	mkdir -p "$$target_bindir" "$$target_man6dir"; \
+	if command -v "${INSTALL}" >/dev/null 2>&1; then \
+		"${INSTALL}" -m 755 spacetrader "$$target_bindir/spacetrader"; \
+		"${INSTALL}" -m 644 spacetrader.6 "$$target_man6dir/spacetrader.6"; \
+	else \
+		cp spacetrader "$$target_bindir/spacetrader"; \
+		chmod 755 "$$target_bindir/spacetrader"; \
+		cp spacetrader.6 "$$target_man6dir/spacetrader.6"; \
+		chmod 644 "$$target_man6dir/spacetrader.6"; \
+	fi
+
+uninstall:
+	@bindir="${BINDIR}"; \
+	if [ -z "$$bindir" ]; then \
+		if [ -d /usr/local/games ]; then \
+			bindir=/usr/local/games; \
+		elif [ -d /usr/games ]; then \
+			bindir=/usr/games; \
+		else \
+			bindir=/usr/local/bin; \
+		fi; \
+	fi; \
+	man6dir="${MAN6DIR}"; \
+	if [ -z "$$man6dir" ]; then \
+		if [ "$$bindir" = "/usr/games" ]; then \
+			man6dir=/usr/share/man/man6; \
+		else \
+			man6dir=/usr/local/share/man/man6; \
+		fi; \
+	fi; \
+	target_bindir="${DESTDIR}$$bindir"; \
+	target_man6dir="${DESTDIR}$$man6dir"; \
+	${RM} "$$target_bindir/spacetrader" "$$target_man6dir/spacetrader.6"
+
+.PHONY: all clean install uninstall

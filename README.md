@@ -6,12 +6,19 @@ lot of the starport on an outlying colony world, Kepler's Reach.
 
 ## Build
 
+### Requirements
+
+  - a working C99 compiler
+  - gnu make
+  - ncurses (library and headers)
+
 ```sh
 ./configure
 make
 ```
 
 `configure` detects a working curses setup (including BSD/Linux differences) and writes `Makefile`.
+It also detects GNU make (`make` or `gmake`) and generates a wrapper `Makefile` that delegates to it.
 
 ## Install
 
