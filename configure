@@ -2,10 +2,10 @@
 
 set -eu
 
-CC=${CC:-cc}
 CFLAGS=${CFLAGS:-"-std=c99 -Wall -Wextra -Wpedantic -O2"}
 CPPFLAGS=${CPPFLAGS:-}
 LDFLAGS=${LDFLAGS:-}
+CC=${CC:-}
 PKG_CONFIG=${PKG_CONFIG:-pkg-config}
 NCURSES_CFLAGS=${NCURSES_CFLAGS:-}
 NCURSES_LIBS=${NCURSES_LIBS:-}
@@ -20,6 +20,28 @@ is_gnu_make() {
         return 1
     fi
     "$make_cmd" --version 2>/dev/null | grep -q "GNU Make"
+}
+
+check_compiler() {
+    compiler="$1"
+
+    if ! command -v "$compiler" >/dev/null 2>&1; then
+        return 1
+    fi
+
+    cat > conftest.c <<'EOF'
+int main(void) {
+    return 0;
+}
+EOF
+
+    if "$compiler" $CFLAGS $CPPFLAGS conftest.c $LDFLAGS -o conftest >/dev/null 2>&1; then
+        rm -f conftest.c conftest
+        return 0
+    fi
+
+    rm -f conftest.c conftest
+    return 1
 }
 
 check_curses_link() {
@@ -54,6 +76,25 @@ elif is_gnu_make gmake; then
 else
     echo "configure: error: GNU make is required to build this project." >&2
     echo "configure: hint: install gmake (GNU make) and rerun ./configure." >&2
+    exit 1
+fi
+
+if [ -n "$CC" ]; then
+    if ! check_compiler "$CC"; then
+        echo "configure: error: C compiler '$CC' is not usable with current flags." >&2
+        exit 1
+    fi
+else
+    for cc_try in gcc clang cc; do
+        if check_compiler "$cc_try"; then
+            CC=$cc_try
+            break
+        fi
+    done
+fi
+
+if [ -z "$CC" ]; then
+    echo "configure: error: could not find a working C99 compiler (tried gcc, clang, cc)." >&2
     exit 1
 fi
 
@@ -99,11 +140,7 @@ cat > Makefile <<EOF
 GNUMAKE = $MAKE_CMD
 
 all spacetrader clean install uninstall:
-	\$(GNUMAKE) -f GNUmakefile \$@ \
-		CC="\$(CC)" CFLAGS="\$(CFLAGS)" CPPFLAGS="\$(CPPFLAGS)" LDFLAGS="\$(LDFLAGS)" \
-		NCURSES_CFLAGS="\$(NCURSES_CFLAGS)" NCURSES_LIBS="\$(NCURSES_LIBS)" \
-		DESTDIR="\$(DESTDIR)" BINDIR="\$(BINDIR)" MAN6DIR="\$(MAN6DIR)" \
-		INSTALL="\$(INSTALL)" RM="\$(RM)"
+	\$(GNUMAKE) -f GNUmakefile \$@
 
 .PHONY: all spacetrader clean install uninstall
 EOF

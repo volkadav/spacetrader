@@ -17,7 +17,8 @@ lot of the starport on an outlying colony world, Kepler's Reach.
 make
 ```
 
-`configure` detects a working curses setup (including BSD/Linux differences) and writes `Makefile`.
+`configure` picks a working C99 compiler (preferring `gcc`, then `clang`, then `cc`, unless `CC` is set),
+detects a working curses setup (including BSD/Linux differences), and writes `Makefile`.
 It also detects GNU make (`make` or `gmake`) and generates a wrapper `Makefile` that delegates to it.
 
 ## Install
