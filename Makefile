@@ -1,5 +1,5 @@
 CC = cc
-CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O2 -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600
+CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O2
 CPPFLAGS = 
 LDFLAGS = 
 NCURSES_CFLAGS = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 
