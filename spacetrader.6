@@ -3,6 +3,9 @@
 spacetrader \- terminal trading and survival game
 .SH SYNOPSIS
 .B spacetrader
+.RB [ --version ]
+.RB [ --savefile " path/to/savefile" ]
+.RB [ --help ]
 .SH DESCRIPTION
 .B spacetrader
 is an ncurses-based trading game set on an outlying colony world, Kepler's Reach.
@@ -10,6 +13,16 @@ Travel between locations, buy and sell goods, manage cargo, survive encounters,
 and try to earn enough credits to get your starship out of the impound lot.
 .PP
 The game runs in a terminal and expects at least an 80x24 display.
+.SH OPTIONS
+.TP
+.B --version
+Print the game version string and exit.
+.TP
+.BI --savefile " path"
+Use the provided file path as the save file location for this run.
+.TP
+.B --help
+Show a short usage summary and defer full gameplay details to this manual page.
 .SH CONTROLS
 .SS Title screen
 .TP

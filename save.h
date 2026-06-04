@@ -15,6 +15,7 @@ typedef enum {
 
 bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size);
 save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buffer_size);
+bool save_set_path_override(const char *path, char *error_buffer, size_t error_buffer_size);
 void load_high_scores(game_t *game);
 void record_high_score(game_t *game, const char *outcome);
 

@@ -1,9 +1,13 @@
 /* save.c: Save/load serialization, corrupt-save handling, and persistent high-score storage. */
 #include "save.h"
 
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "market.h"
 #include "util.h"
@@ -14,6 +18,13 @@
 #define SCORE_VERSION 1u
 #define SAVE_FILENAME ".spacetrader.sav"
 #define SCORE_FILENAME ".spacetrader.scores"
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+static char save_path_override[PATH_MAX];
+static bool save_path_override_set = false;
 
 typedef struct {
     uint32_t magic;
@@ -53,6 +64,126 @@ static int score_value(const game_t *game) {
  */
 static bool append_suffix(const char *path, const char *suffix, char *buffer, size_t buffer_size) {
     return snprintf(buffer, buffer_size, "%s%s", path, suffix) < (int)buffer_size;
+}
+
+/**
+ * Purpose: Implements save path directory.
+ * Parameters:
+ *   - path (const char *): Input argument used by this routine.
+ *   - directory (char *): Output buffer populated by this routine.
+ *   - directory_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
+static bool save_path_directory(const char *path, char *directory, size_t directory_size) {
+    const char *slash;
+    size_t prefix_len;
+
+    if (path == NULL || directory == NULL || directory_size == 0 || path[0] == '\0') {
+        return false;
+    }
+    if (path[strlen(path) - 1] == '/') {
+        return false;
+    }
+
+    slash = strrchr(path, '/');
+    if (slash == NULL) {
+        return snprintf(directory, directory_size, ".") < (int)directory_size;
+    }
+
+    prefix_len = (size_t)(slash - path);
+    if (prefix_len == 0) {
+        return snprintf(directory, directory_size, "/") < (int)directory_size;
+    }
+    if (prefix_len >= directory_size) {
+        return false;
+    }
+
+    memcpy(directory, path, prefix_len);
+    directory[prefix_len] = '\0';
+    return true;
+}
+
+/**
+ * Purpose: Implements validate override path.
+ * Parameters:
+ *   - path (const char *): Input argument used by this routine.
+ *   - error_buffer (char *): Output buffer populated by this routine.
+ *   - error_buffer_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
+static bool validate_override_path(const char *path, char *error_buffer, size_t error_buffer_size) {
+    struct stat path_stat;
+
+    if (path == NULL || path[0] == '\0') {
+        snprintf(error_buffer, error_buffer_size, "Save path cannot be empty.");
+        return false;
+    }
+    if (strlen(path) >= PATH_MAX) {
+        snprintf(error_buffer, error_buffer_size, "Save path is too long.");
+        return false;
+    }
+
+    if (stat(path, &path_stat) == 0) {
+        if (!S_ISREG(path_stat.st_mode)) {
+            snprintf(error_buffer, error_buffer_size, "Save path must point to a regular file.");
+            return false;
+        }
+        if (access(path, R_OK) != 0) {
+            snprintf(error_buffer, error_buffer_size, "Save file is not readable: %s", strerror(errno));
+            return false;
+        }
+        if (access(path, W_OK) != 0) {
+            snprintf(error_buffer, error_buffer_size, "Save file is not writable: %s", strerror(errno));
+            return false;
+        }
+        return true;
+    }
+
+    if (errno != ENOENT) {
+        snprintf(error_buffer, error_buffer_size, "Could not inspect save path: %s", strerror(errno));
+        return false;
+    }
+
+    {
+        char directory[PATH_MAX];
+        struct stat directory_stat;
+
+        if (!save_path_directory(path, directory, sizeof(directory))) {
+            snprintf(error_buffer, error_buffer_size, "Save path must include a valid filename.");
+            return false;
+        }
+        if (stat(directory, &directory_stat) != 0) {
+            snprintf(error_buffer, error_buffer_size, "Save directory is not accessible: %s", strerror(errno));
+            return false;
+        }
+        if (!S_ISDIR(directory_stat.st_mode)) {
+            snprintf(error_buffer, error_buffer_size, "Save directory path is not a directory.");
+            return false;
+        }
+        if (access(directory, W_OK | X_OK) != 0) {
+            snprintf(error_buffer, error_buffer_size, "Save directory is not writable: %s", strerror(errno));
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Purpose: Implements resolve save path.
+ * Parameters:
+ *   - path (char *): Output buffer populated by this routine.
+ *   - path_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
+static bool resolve_save_path(char *path, size_t path_size) {
+    if (save_path_override_set) {
+        return snprintf(path, path_size, "%s", save_path_override) < (int)path_size;
+    }
+    return home_file_path(SAVE_FILENAME, path, path_size);
 }
 
 /**
@@ -179,6 +310,24 @@ static bool archive_corrupt_save(const char *save_path, char *backup_path, size_
 }
 
 /**
+ * Purpose: Implements save set path override.
+ * Parameters:
+ *   - path (const char *): Input argument used by this routine.
+ *   - error_buffer (char *): Output buffer populated by this routine.
+ *   - error_buffer_size (size_t): Output buffer populated by this routine.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
+bool save_set_path_override(const char *path, char *error_buffer, size_t error_buffer_size) {
+    if (!validate_override_path(path, error_buffer, error_buffer_size)) {
+        return false;
+    }
+    snprintf(save_path_override, sizeof(save_path_override), "%s", path);
+    save_path_override_set = true;
+    return true;
+}
+
+/**
  * Purpose: Implements save game.
  * Parameters:
  *   - game (const game_t *): Game state this routine reads and/or updates.
@@ -188,11 +337,11 @@ static bool archive_corrupt_save(const char *save_path, char *backup_path, size_
  *   - bool: True when the operation succeeds or the condition is met; false otherwise.
  */
 bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size) {
-    char path[512];
+    char path[PATH_MAX];
     FILE *fp;
     save_blob_t blob;
 
-    if (!home_file_path(SAVE_FILENAME, path, sizeof(path))) {
+    if (!resolve_save_path(path, sizeof(path))) {
         snprintf(error_buffer, error_buffer_size, "Could not determine save path.");
         return false;
     }
@@ -228,13 +377,13 @@ bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size)
  *   - save_load_result_t: Return value describing the outcome of this routine.
  */
 save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buffer_size) {
-    char path[512];
-    char backup_path[540];
+    char path[PATH_MAX];
+    char backup_path[PATH_MAX + 32];
     FILE *fp;
     save_blob_t blob;
     bool archived;
 
-    if (!home_file_path(SAVE_FILENAME, path, sizeof(path))) {
+    if (!resolve_save_path(path, sizeof(path))) {
         snprintf(error_buffer, error_buffer_size, "Could not determine save path.");
         return SAVE_LOAD_ERROR;
     }
