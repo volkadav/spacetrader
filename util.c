@@ -1,6 +1,7 @@
 /* util.c: Shared utility helpers for RNG, logging, checksums, and path handling. */
 #include "util.h"
 
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,12 +112,33 @@ void game_set_game_over(game_t *game, const char *reason) {
 }
 
 /**
+ * Purpose: Implements apply bank interest.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
+static void apply_bank_interest(game_t *game) {
+    int interest;
+
+    if (game->player.bank_balance <= 0) {
+        return;
+    }
+
+    interest = game->player.bank_balance / 100;
+    if (interest <= 0) {
+        return;
+    }
+
+    game->player.bank_balance = clamp_int(game->player.bank_balance + interest, 0, INT_MAX);
+}
+
+/**
  * Purpose: Implements game advance turn.
  * Parameters:
  *   - game (game_t *): Game state this routine reads and/or updates.
  */
 void game_advance_turn(game_t *game) {
     game->turn++;
+    apply_bank_interest(game);
     world_decay_drops(game);
 }
 

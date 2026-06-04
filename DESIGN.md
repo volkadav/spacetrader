@@ -30,7 +30,8 @@ spacetrader/
 ├── main.c            — entry point, game loop, signal handling
 ├── ui.c / ui.h       — all ncurses rendering, window layout, input handling
 ├── world.c / world.h — location graph, travel, location descriptions
-├── market.c / market.h — commodity prices, buy/sell, supply/demand
+├── market.c / market.h — trade UI (gear/commodities/ATM), commodity prices, buy/sell
+├── bank.c / bank.h   — First Planetary Bank account, ATM deposit/withdraw, interest
 ├── player.c / player.h — player stats, inventory, equipment, health
 ├── combat.c / combat.h — turn-based on-foot combat engine
 ├── encounter.c / encounter.h — random encounter table & resolution
@@ -52,7 +53,7 @@ TITLE → NEW_GAME
       │   (Starport, settlement, or wilderness)     │
       │                                             │
       │  Starport:  pay impound → WIN               │
-      │  Settlement: STORE · BAR · CLINIC           │
+      │  Settlement: STORE(gear/commodities/ATM) · BAR · CLINIC │
       │  Wilderness: ENCOUNTER · PROSPECT           │
       └─────────────────────────────────────────────┘
            │
@@ -135,7 +136,8 @@ settlement first.
 ### 3.3 Starport
 
 The Starport acts as the hub and is the most developed location.  It has:
-- A **Market** (broadest commodity selection, moderate prices; also sells the Cargo Hover)
+- A **Market** (shopkeeper intro/dialog first, then **Gear / Commodities / ATM**;
+  broadest commodity selection, moderate prices; also sells the Cargo Hover)
 - A **Bar** (gambling, rumours)
 - A **Hospital** (health restoration)
 - The **Port Authority** desk (pay impound fee to win)
@@ -148,7 +150,7 @@ Each of the four settlements has exactly three services:
 
 | Service | Function                                                       |
 |---------|----------------------------------------------------------------|
-| **Store**   | Buy and sell commodities; buy arms and armor              |
+| **Store**   | Shopkeeper intro + dialogue, then choose **Gear**, **Commodities**, or **ATM** |
 | **Bar**     | Rumours, optional brawls, blackjack and roulette gambling |
 | **Clinic**  | Restore up to 3 HP for 25 Cr per point                   |
 
@@ -331,7 +333,29 @@ These are shown in the main viewport and remain visible until the player takes a
 
 ---
 
-### 3.7 Named NPCs
+### 3.7 Store/Market Interaction Flow
+
+When the player enters a Settlement **Store** or the Starport **Market**, the left
+"location" pane is ordered as:
+
+1. Shopkeeper identity + flavour description.
+2. Reputation-tier greeting/dialogue line.
+3. Menu options:
+   - `1) Gear`
+   - `2) Commodities`
+   - `3) ATM` *(First Planetary Bank of Kepler's Reach)*
+
+`Gear` contains non-commodity items: weapons, armor, first-aid supplies, utility
+equipment, and transport/logistics assets (mule, cart, Cargo Hover where available).
+
+`Commodities` opens the normal commodity buy/sell tables.
+
+`ATM` opens a bank terminal interface (see §4.5).
+
+Returning from Gear/Commodities/ATM restores this top-level shop/market view with the
+shopkeeper text visible first.
+
+### 3.8 Named NPCs
 
 Each service location has a named NPC whose greeting and demeanour shift across three
 reputation tiers:
@@ -568,6 +592,36 @@ Reputation affects:
   reduced by **5%** at reputation **≥ +2** (rounded down to whole credits).  Sell prices
   are unchanged.  High-reputation "reserved stock" dialogue is flavour only in v0.1.
 - Hospital prices are fixed (no reputation discount).
+
+---
+
+### 4.5 Bank Account (ATM)
+
+The player has one account with the **First Planetary Bank of Kepler's Reach**.
+Banked credits are separate from cash on hand.
+
+ATM access is available as option `3) ATM` inside Store/Market interaction.
+
+ATM screen shows:
+- Cash on hand
+- Bank account balance
+- Actions: `[D]eposit` and `[W]ithdraw`
+
+Rules:
+- Balances are always integer credits.
+- Deposit amount must be `0 < amount <= credits_on_hand`.
+- Withdraw amount must be `0 < amount <= bank_balance`.
+- No overdraft/credit line.
+- Any fractional credits produced by calculations are rounded down (floor).
+
+Interest:
+- Banked funds accrue **1% interest per eligible turn**.
+- Eligible turns are non-combat world turns that advance game time (e.g., location
+  arrival/travel progression, prospecting, resting, and similar turn-consuming actions).
+- Combat rounds do **not** apply interest.
+- Calculation per eligible turn:
+  `bank_balance = floor(bank_balance * 1.01)`
+  (integer implementation equivalent: `bank_balance += bank_balance / 100`).
 
 ---
 
@@ -979,8 +1033,9 @@ Colors used when `has_colors()` is true; graceful monochrome fallback.
 ║                                        ║  INVENTORY (7/10 units)           ║
 ║   [Main viewport — 40×16 chars]        ║  Grain x3          3.0 u          ║
 ║                                        ║  Spices x6         3.0 u          ║
-║   Location description, menus,         ║  Furs x1           1.0 u          ║
-║   market tables, combat, maps, etc.    ║                                   ║
+║   Location/shopkeeper description,      ║  Furs x1           1.0 u          ║
+║   dialogue, trade/ATM menus, combat,    ║                                   ║
+║   maps, etc.                            ║                                   ║
 ║                                        ║─────────────────────────────────  ║
 ║                                        ║  Weapon: Pistol                   ║
 ║                                        ║  Armor:  Leather Jacket (DR 1)    ║
@@ -1167,17 +1222,20 @@ Single-key commands throughout.  Quantity entry uses `+`/`−` or a typed number
 | T           | Location          | Travel menu (alternate)         |
 | P           | Wilderness        | Prospect                        |
 | R           | Wilderness        | Sleep rough (recover 1 HP, free, risky) |
-| S           | Settlement        | Visit Store                     |
+| S           | Settlement        | Visit Store (Gear/Commodities/ATM hub) |
 | B           | Settlement/Starport | Visit Bar                     |
 | C           | Settlement        | Visit Clinic (up to 3 HP, 25 Cr/pt)    |
 | H           | Starport          | Visit Hospital (up to 8 HP, 50 Cr/pt)  |
 | I           | Anywhere          | Inventory / drop items                          |
 | G           | Location w/ drops | Grab dropped cargo from the ground              |
-| M           | Starport          | Market                          |
+| M           | Starport          | Visit Market (Gear/Commodities/ATM hub) |
+| 1/2/3       | Store/Market hub  | Select Gear / Commodities / ATM |
+| D           | ATM               | Deposit funds into bank account |
+| W           | ATM               | Withdraw funds (up to balance)  |
 | V           | Anywhere          | Manual save                     |
 | X           | Starport          | Pay impound fee (if enough cr)  |
-| +/−         | Market/gambling   | Adjust quantity or bet          |
-| 0–9         | Market/gambling   | Quick numeric entry             |
+| +/−         | Market/ATM/gambling | Adjust quantity, transfer amount, or bet |
+| 0–9         | Market/ATM/gambling | Quick numeric entry            |
 | Esc         | Sub-menus         | Back                            |
 | Q           | Anywhere          | Quit (with confirmation)        |
 | ?           | Anywhere          | Context-sensitive help          |
@@ -1193,7 +1251,7 @@ typedef struct {
     uint32_t magic;     // 0x53504143  ("SPAC")
     uint16_t version;   // file format version
     uint32_t checksum;  // CRC32 of everything after this field
-    game_t   state;     // full game state (player, world, markets, turn count)
+    game_t   state;     // full game state (player, world, markets, bank balance, turn count)
 } savefile_t;
 ```
 

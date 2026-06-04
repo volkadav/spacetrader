@@ -9,8 +9,9 @@
 #include "util.h"
 
 #define SAVE_MAGIC 0x53504143u
-#define SAVE_VERSION 1u
+#define SAVE_VERSION 2u
 #define SCORE_MAGIC 0x53545253u
+#define SCORE_VERSION 1u
 #define SAVE_FILENAME ".spacetrader.sav"
 #define SCORE_FILENAME ".spacetrader.scores"
 
@@ -37,7 +38,7 @@ typedef struct {
  *   - int: Computed numeric result for this routine.
  */
 static int score_value(const game_t *game) {
-    return game->player.credits + market_estimate_cargo_value(game) + (game->turn * 10);
+    return game->player.credits + game->player.bank_balance + market_estimate_cargo_value(game) + (game->turn * 10);
 }
 
 /**
@@ -52,6 +53,111 @@ static int score_value(const game_t *game) {
  */
 static bool append_suffix(const char *path, const char *suffix, char *buffer, size_t buffer_size) {
     return snprintf(buffer, buffer_size, "%s%s", path, suffix) < (int)buffer_size;
+}
+
+/**
+ * Purpose: Implements sanitize loaded game.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
+static void sanitize_loaded_game(game_t *game) {
+    int cargo_count;
+    int write_index = 0;
+
+    game->state = (game_state_t)clamp_int((int)game->state, (int)GAME_STATE_TITLE, (int)GAME_STATE_VICTORY);
+    game->player.location = (location_id_t)clamp_int((int)game->player.location, 0, MAX_LOCATIONS - 1);
+    game->player.weapon = (weapon_t)clamp_int((int)game->player.weapon, (int)WEAPON_FISTS, (int)(WEAPON_COUNT - 1));
+    game->player.armor = (armor_t)clamp_int((int)game->player.armor, (int)ARMOR_NONE, (int)(ARMOR_COUNT - 1));
+
+    game->player.max_hp = clamp_int(game->player.max_hp, 1, 99);
+    game->player.hp = clamp_int(game->player.hp, 0, game->player.max_hp);
+    game->player.credits = clamp_int(game->player.credits, 0, 1000000000);
+    game->player.bank_balance = clamp_int(game->player.bank_balance, 0, 1000000000);
+    game->player.reputation = clamp_int(game->player.reputation, -999, 999);
+    game->player.bandages = clamp_int(game->player.bandages, 0, 9999);
+    game->player.medkit_uses = clamp_int(game->player.medkit_uses, 0, 9999);
+    game->turn = clamp_int(game->turn, 0, 1000000000);
+    game->poison_turns = clamp_int(game->poison_turns, 0, 99);
+    game->prospect_bonus = clamp_int(game->prospect_bonus, -999, 9999);
+    game->score_count = clamp_int(game->score_count, 0, MAX_HIGH_SCORES);
+    game->log.head = clamp_int(game->log.head, 0, NEWS_TICKER_LINES - 1);
+    game->log.count = clamp_int(game->log.count, 0, NEWS_TICKER_LINES);
+
+    game->player.has_prospecting_kit = !!game->player.has_prospecting_kit;
+    game->player.has_sturdy_pack = !!game->player.has_sturdy_pack;
+    game->player.has_lucky_charm = !!game->player.has_lucky_charm;
+    game->player.has_mule = !!game->player.has_mule;
+    game->player.has_cart = !!game->player.has_cart;
+    game->player.owns_cart = !!game->player.owns_cart;
+    game->player.has_hover = !!game->player.has_hover;
+    game->running = !!game->running;
+    game->player_won = !!game->player_won;
+    game->score_recorded = !!game->score_recorded;
+
+    cargo_count = clamp_int(game->player.cargo_count, 0, MAX_CARGO_STACKS);
+    for (int i = 0; i < cargo_count; ++i) {
+        cargo_stack_t stack = game->player.cargo[i];
+
+        if (stack.commodity < 0 || stack.commodity >= NUM_COMMODITIES || stack.quantity <= 0) {
+            continue;
+        }
+        if (write_index != i) {
+            game->player.cargo[write_index] = stack;
+        }
+        write_index++;
+    }
+    for (int i = write_index; i < MAX_CARGO_STACKS; ++i) {
+        game->player.cargo[i].commodity = COMMODITY_FOOD_RATIONS;
+        game->player.cargo[i].quantity = 0;
+    }
+    game->player.cargo_count = write_index;
+
+    for (int location = 0; location < MAX_LOCATIONS; ++location) {
+        for (int commodity = 0; commodity < NUM_COMMODITIES; ++commodity) {
+            game->markets[location].stock[commodity] =
+                (int16_t)clamp_int(game->markets[location].stock[commodity], 0, 30000);
+            game->markets[location].prices[commodity] =
+                clamp_int(game->markets[location].prices[commodity], 1, 1000000);
+        }
+        game->markets[location].known = !!game->markets[location].known;
+
+        for (int slot = 0; slot < MAX_DROP_STACKS_PER_LOCATION; ++slot) {
+            drop_slot_t *drop = &game->drops[location].slots[slot];
+
+            if (!drop->occupied) {
+                drop->kind = DROP_KIND_NONE;
+                drop->commodity = COMMODITY_FOOD_RATIONS;
+                drop->quantity = 0;
+                drop->age = 0;
+                continue;
+            }
+
+            if (drop->kind < DROP_KIND_NONE || drop->kind > DROP_KIND_CART) {
+                drop->occupied = false;
+                drop->kind = DROP_KIND_NONE;
+                drop->commodity = COMMODITY_FOOD_RATIONS;
+                drop->quantity = 0;
+                drop->age = 0;
+                continue;
+            }
+
+            if (drop->kind == DROP_KIND_COMMODITY &&
+                (drop->commodity < 0 || drop->commodity >= NUM_COMMODITIES || drop->quantity <= 0)) {
+                drop->occupied = false;
+                drop->kind = DROP_KIND_NONE;
+                drop->commodity = COMMODITY_FOOD_RATIONS;
+                drop->quantity = 0;
+                drop->age = 0;
+                continue;
+            }
+
+            if (drop->kind == DROP_KIND_CART) {
+                drop->commodity = COMMODITY_FOOD_RATIONS;
+                drop->quantity = 1;
+            }
+            drop->age = clamp_int(drop->age, 0, 1000000);
+        }
+    }
 }
 
 /**
@@ -169,6 +275,7 @@ save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buff
     }
 
     *game = blob.game;
+    sanitize_loaded_game(game);
     game->running = true;
     return SAVE_LOAD_OK;
 }
@@ -194,7 +301,7 @@ void load_high_scores(game_t *game) {
         return;
     }
 
-    if (fread(&blob, sizeof(blob), 1, fp) != 1 || blob.magic != SCORE_MAGIC || blob.version != SAVE_VERSION) {
+    if (fread(&blob, sizeof(blob), 1, fp) != 1 || blob.magic != SCORE_MAGIC || blob.version != SCORE_VERSION) {
         fclose(fp);
         game->score_count = 0;
         memset(game->scores, 0, sizeof(game->scores));
@@ -202,8 +309,12 @@ void load_high_scores(game_t *game) {
     }
     fclose(fp);
 
-    game->score_count = blob.score_count;
+    game->score_count = clamp_int(blob.score_count, 0, MAX_HIGH_SCORES);
     memcpy(game->scores, blob.scores, sizeof(blob.scores));
+    for (int i = 0; i < MAX_HIGH_SCORES; ++i) {
+        game->scores[i].name[sizeof(game->scores[i].name) - 1] = '\0';
+        game->scores[i].outcome[sizeof(game->scores[i].outcome) - 1] = '\0';
+    }
 }
 
 /**
@@ -227,7 +338,7 @@ void record_high_score(game_t *game, const char *outcome) {
     memset(&entry, 0, sizeof(entry));
     snprintf(entry.name, sizeof(entry.name), "%s", user != NULL ? user : "TRADER");
     snprintf(entry.outcome, sizeof(entry.outcome), "%s", outcome);
-    entry.credits = game->player.credits;
+    entry.credits = game->player.credits + game->player.bank_balance;
     entry.cargo_value = market_estimate_cargo_value(game);
     entry.turns = game->turn;
     entry.score = score_value(game);
@@ -267,7 +378,7 @@ void record_high_score(game_t *game, const char *outcome) {
     }
 
     blob.magic = SCORE_MAGIC;
-    blob.version = SAVE_VERSION;
+    blob.version = SCORE_VERSION;
     blob.score_count = game->score_count;
     memcpy(blob.scores, game->scores, sizeof(blob.scores));
 

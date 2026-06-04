@@ -73,5 +73,7 @@ int player_flee_penalty(const player_t *player);
 bool player_can_offer_shop_item(location_id_t location, shop_item_id_t item);
 bool player_buy_shop_item(game_t *game, shop_item_id_t item);
 bool player_owns_shop_item(const player_t *player, shop_item_id_t item);
+bool player_deposit_credits(game_t *game, int amount);
+bool player_withdraw_credits(game_t *game, int amount);
 
 #endif

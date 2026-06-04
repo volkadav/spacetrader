@@ -1,6 +1,7 @@
 /* player.c: Player state, cargo management, and purchasable equipment/shop item logic. */
 #include "player.h"
 
+#include <limits.h>
 #include <string.h>
 
 #include "util.h"
@@ -467,5 +468,61 @@ bool player_buy_shop_item(game_t *game, shop_item_id_t item) {
     }
 
     game_log(game, "Purchased %s for %d cr.", SHOP_ITEMS[item].name, price);
+    return true;
+}
+
+/**
+ * Purpose: Implements player deposit credits.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - amount (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
+bool player_deposit_credits(game_t *game, int amount) {
+    if (amount <= 0) {
+        game_log(game, "Deposit amount must be at least 1 cr.");
+        return false;
+    }
+    if (amount > game->player.credits) {
+        game_log(game, "You only have %d cr on hand.", game->player.credits);
+        return false;
+    }
+    if (game->player.bank_balance > INT_MAX - amount) {
+        game_log(game, "Bank account cannot hold that much.");
+        return false;
+    }
+
+    game->player.credits -= amount;
+    game->player.bank_balance += amount;
+    game_log(game, "Deposited %d cr. Bank balance: %d cr.", amount, game->player.bank_balance);
+    return true;
+}
+
+/**
+ * Purpose: Implements player withdraw credits.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ *   - amount (int): Numeric input used by this routine for calculations or limits.
+ * Returns:
+ *   - bool: True when the operation succeeds or the condition is met; false otherwise.
+ */
+bool player_withdraw_credits(game_t *game, int amount) {
+    if (amount <= 0) {
+        game_log(game, "Withdrawal amount must be at least 1 cr.");
+        return false;
+    }
+    if (amount > game->player.bank_balance) {
+        game_log(game, "Insufficient bank balance.");
+        return false;
+    }
+    if (game->player.credits > INT_MAX - amount) {
+        game_log(game, "You cannot carry that many credits.");
+        return false;
+    }
+
+    game->player.bank_balance -= amount;
+    game->player.credits += amount;
+    game_log(game, "Withdrew %d cr. Bank balance: %d cr.", amount, game->player.bank_balance);
     return true;
 }

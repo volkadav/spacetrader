@@ -37,6 +37,7 @@ static volatile sig_atomic_t ui_resize_pending = 0;
 static bool confirm_exit_game(void);
 static void blackjack_menu(game_t *game);
 static void roulette_menu(game_t *game);
+static void trade_hub_menu(game_t *game);
 static void ui_prepare_screen(void);
 static int ui_getch(void);
 
@@ -51,6 +52,7 @@ typedef struct {
     const char *low;
     const char *neutral;
     const char *high;
+    const char *description;
 } npc_dialogue_t;
 
 static const npc_dialogue_t BAR_NPCS[MAX_LOCATIONS] = {
@@ -124,31 +126,36 @@ static const npc_dialogue_t TRADE_NPCS[MAX_LOCATIONS] = {
         "Juno Creed",
         "I don't do charity and I don't do credit. Cash, up front.",
         "Here to buy or to look? Either way, don't touch the merchandise.",
-        "I've been saving something back for you, actually. Come have a look."
+        "I've been saving something back for you, actually. Come have a look.",
+        "Sharp-eyed market broker with a ledger memory and no patience for sloppy deals."
     },
     [LOCATION_ASHFIELD] = {
         "Dottie Marsh",
         "I run a clean shop. You cause trouble, you take it elsewhere.",
         "Looking for something in particular, or just browsing?",
-        "I kept a few things back since I thought you might be coming through. Have a look."
+        "I kept a few things back since I thought you might be coming through. Have a look.",
+        "Practical storekeeper who has run Marsh Provisions long enough to spot trouble at a glance."
     },
     [LOCATION_BROKENHILL] = {
         "Gal Okonkwo",
         "My prices aren't negotiable and neither am I. Buy or don't.",
         "Stock list is on the board. Let me know what you need.",
-        "Always good to deal with someone who knows the value of things. I'll see what I can do on the price."
+        "Always good to deal with someone who knows the value of things. I'll see what I can do on the price.",
+        "Disciplined trader who built Brokenhill's strongest supply line from one ore cart."
     },
     [LOCATION_COLDWATER] = {
         "Tomasz Wick",
         "Coldwater's a trading town. You want something, you pay for it. Simple.",
         "Good day. Stock's fresh in. The board shows what we have.",
-        "Ah, my favourite customer. Let me show you what came in on the last run."
+        "Ah, my favourite customer. Let me show you what came in on the last run.",
+        "Third-generation merchant who treats price discovery like a craft."
     },
     [LOCATION_MILLHAVEN] = {
         "Pell",
         "We trade with everyone. The collective voted on it. Doesn't mean I have to enjoy it.",
         "Welcome to the collective store. We have what we have.",
-        "Oh good, it's you. I kept some of the good grain aside - I thought you might be passing through."
+        "Oh good, it's you. I kept some of the good grain aside - I thought you might be passing through.",
+        "Millhaven's rotation trader: earnest, fair, and strict about collective pricing."
     }
 };
 
@@ -250,6 +257,39 @@ static void format_npc_quote(const char *line, char *buffer, size_t buffer_size)
     }
 
     snprintf(buffer, buffer_size, "\"%s\"", line);
+}
+
+/**
+ * Purpose: Implements format npc profile.
+ * Parameters:
+ *   - npc (const npc_dialogue_t *): Input argument used by this routine.
+ *   - fallback_role (const char *): Text input used for display, messaging, or formatting.
+ *   - buffer (char *): Output buffer populated by this routine.
+ *   - buffer_size (size_t): Output buffer populated by this routine.
+ */
+static void format_npc_profile(const npc_dialogue_t *npc,
+                               const char *fallback_role,
+                               char *buffer,
+                               size_t buffer_size) {
+    if (buffer == NULL || buffer_size == 0) {
+        return;
+    }
+
+    if (fallback_role == NULL || fallback_role[0] == '\0') {
+        fallback_role = "shopkeeper";
+    }
+
+    if (npc != NULL && npc->description != NULL && npc->description[0] != '\0') {
+        snprintf(buffer, buffer_size, "%s", npc->description);
+        return;
+    }
+
+    if (npc != NULL && npc->name != NULL && npc->name[0] != '\0') {
+        snprintf(buffer, buffer_size, "%s is waiting behind the counter.", npc->name);
+        return;
+    }
+
+    snprintf(buffer, buffer_size, "A local %s is waiting behind the counter.", fallback_role);
 }
 
 /**
@@ -993,9 +1033,10 @@ static void draw_base_frame(const game_t *game, const char *commands) {
     clear();
     ui_draw_horizontal_separator(0, 0, 79, '=');
     mvprintw(0, 2, "SPACE TRADER (%s)", SPACE_TRADER_VERSION);
-    mvprintw(0, 30, "Turn: %d", game->turn);
-    mvprintw(0, 45, "Credits: %d", game->player.credits);
-    mvprintw(0, 65, "Rep: %d", game->player.reputation);
+    mvprintw(0, 26, "Turn: %d", game->turn);
+    mvprintw(0, 38, "Credits: %d", game->player.credits);
+    mvprintw(0, 54, "Bank: %d", game->player.bank_balance);
+    mvprintw(0, 69, "Rep: %d", game->player.reputation);
     ui_draw_horizontal_separator(20, 0, 79, '-');
     ui_draw_vertical_separator(LEFT_WIDTH, 1, 20, '|');
     mvaddch(20, LEFT_WIDTH, '+');
@@ -1267,7 +1308,7 @@ static void trade_menu(game_t *game, bool fence) {
 
     for (int i = 0; i < NUM_COMMODITIES; ++i) {
         bool show = fence ? (i == COMMODITY_NARCOTICS || i == COMMODITY_STOLEN_GOODS || i == COMMODITY_ARTIFACTS)
-                          : true;
+                          : market_can_buy_openly(game->player.location, (commodity_id_t)i);
         if (show) {
             options[option_count++] = i;
         }
@@ -1505,6 +1546,241 @@ static void store_menu(game_t *game) {
         case '\n':
         case KEY_ENTER:
             player_buy_shop_item(game, (shop_item_id_t)options[selected]);
+            break;
+        case 27:
+        case 'q':
+        case 'Q':
+            running = 0;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+/**
+ * Purpose: Implements atm transfer limit.
+ * Parameters:
+ *   - game (const game_t *): Game state this routine reads and/or updates.
+ *   - deposit_mode (bool): Boolean flag controlling conditional behavior.
+ * Returns:
+ *   - int: Computed numeric result for this routine.
+ */
+static int atm_transfer_limit(const game_t *game, bool deposit_mode) {
+    return deposit_mode ? game->player.credits : game->player.bank_balance;
+}
+
+/**
+ * Purpose: Implements clamp atm amount.
+ * Parameters:
+ *   - amount (int *): Input argument used by this routine.
+ *   - limit (int): Numeric input used by this routine for calculations or limits.
+ */
+static void clamp_atm_amount(int *amount, int limit) {
+    if (amount == NULL) {
+        return;
+    }
+    if (limit <= 0) {
+        *amount = 0;
+        return;
+    }
+
+    *amount = clamp_int(*amount, 1, limit);
+}
+
+/**
+ * Purpose: Implements atm menu.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
+static void atm_menu(game_t *game) {
+    int amount = 1;
+    bool deposit_mode = true;
+    bool typing_amount = false;
+    int running = 1;
+
+    while (running) {
+        int limit = atm_transfer_limit(game, deposit_mode);
+        int ch;
+
+        clamp_atm_amount(&amount, limit);
+        draw_base_frame(game, "[D]eposit [W]ithdraw [Enter] confirm [+/-/0-9] amount [Esc]");
+        mvprintw(2, 2, "First Planetary Bank of Kepler's Reach");
+        mvprintw(4, 2, "Cash on hand : %d cr", game->player.credits);
+        mvprintw(5, 2, "Bank balance : %d cr", game->player.bank_balance);
+        mvprintw(7, 2, "Selected action : %s", deposit_mode ? "Deposit" : "Withdraw");
+        mvprintw(8, 2, "Transfer amount : %d cr (max %d)", amount, limit);
+
+        if (limit <= 0) {
+            mvprintw(10, 2, "%s unavailable: insufficient %s.",
+                     deposit_mode ? "Deposit" : "Withdraw",
+                     deposit_mode ? "cash on hand" : "bank balance");
+        } else if (limit < 100) {
+            mvprintw(10, 2, "Balances below 100 cr earn 0 interest this turn (floor rounding).");
+        }
+        mvprintw(12, 2, "Press D or W to execute immediately, or Enter for selected action.");
+        refresh();
+
+        ch = ui_getch();
+        switch (ch) {
+        case 'd':
+        case 'D':
+            deposit_mode = true;
+            typing_amount = false;
+            clamp_atm_amount(&amount, atm_transfer_limit(game, true));
+            player_deposit_credits(game, amount);
+            break;
+        case 'w':
+        case 'W':
+            deposit_mode = false;
+            typing_amount = false;
+            clamp_atm_amount(&amount, atm_transfer_limit(game, false));
+            player_withdraw_credits(game, amount);
+            break;
+        case '\n':
+        case KEY_ENTER:
+            typing_amount = false;
+            if (deposit_mode) {
+                player_deposit_credits(game, amount);
+            } else {
+                player_withdraw_credits(game, amount);
+            }
+            break;
+        case '+':
+            typing_amount = false;
+            if (limit > 0) {
+                amount = clamp_int(amount + 1, 1, limit);
+            }
+            break;
+        case '-':
+            typing_amount = false;
+            if (limit > 0) {
+                amount = clamp_int(amount - 1, 1, limit);
+            }
+            break;
+        case KEY_BACKSPACE:
+        case 127:
+            if (typing_amount) {
+                amount /= 10;
+                if (amount <= 0) {
+                    typing_amount = false;
+                }
+            }
+            break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            if (limit > 0) {
+                int digit = ch - '0';
+                long value;
+
+                if (!typing_amount) {
+                    value = digit;
+                    typing_amount = true;
+                } else {
+                    value = (long)amount * 10L + digit;
+                }
+                if (value > limit) {
+                    value = limit;
+                }
+                if (value < 0) {
+                    value = 0;
+                }
+                amount = (int)value;
+            }
+            break;
+        case 27:
+        case 'q':
+        case 'Q':
+            running = 0;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+/**
+ * Purpose: Implements trade hub menu.
+ * Parameters:
+ *   - game (game_t *): Game state this routine reads and/or updates.
+ */
+static void trade_hub_menu(game_t *game) {
+    const npc_dialogue_t *trade_npc = npc_dialogue_for(TRADE_NPCS, game->player.location);
+    const char *trade_line = npc_dialogue_line(trade_npc, game->player.reputation);
+    char trade_speaker[LOG_LINE_LENGTH];
+    char trade_profile[LOG_LINE_LENGTH];
+    char trade_quote[LOG_LINE_LENGTH];
+    int selected = 0;
+    int running = 1;
+    static const char *OPTIONS[3] = {"1) Gear", "2) Commodities", "3) ATM"};
+
+    format_npc_speaker(trade_npc, "shopkeeper", trade_speaker, sizeof(trade_speaker));
+    format_npc_profile(trade_npc, "shopkeeper", trade_profile, sizeof(trade_profile));
+    format_npc_quote(trade_line, trade_quote, sizeof(trade_quote));
+
+    while (running) {
+        int ch;
+        const char *title = game->player.location == LOCATION_STARPORT ? "Starport Market" : "Settlement Store";
+
+        draw_base_frame(game, "[1]Gear [2]Commodities [3]ATM [Up/Down] [Enter] [Esc]");
+        mvprintw(2, 2, "%s", title);
+        mvaddnstr(4, LEFT_TEXT_X, trade_speaker, LEFT_TEXT_WIDTH);
+        draw_wrapped_text(trade_profile, 5, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 4, 0);
+        draw_wrapped_text(trade_quote, 9, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 3, 0);
+        mvprintw(13, 2, "Available services:");
+
+        for (int row = 0; row < 3; ++row) {
+            if (row == selected) {
+                attron(A_REVERSE);
+            }
+            mvaddnstr(14 + row, LEFT_TEXT_X, OPTIONS[row], LEFT_TEXT_WIDTH);
+            if (row == selected) {
+                attroff(A_REVERSE);
+            }
+        }
+        mvprintw(18, 2, "Choose with 1-3, arrows, or Enter.");
+        refresh();
+
+        ch = ui_getch();
+        switch (ch) {
+        case '1':
+        case 'g':
+        case 'G':
+            store_menu(game);
+            break;
+        case '2':
+        case 'c':
+        case 'C':
+            trade_menu(game, false);
+            break;
+        case '3':
+        case 'a':
+        case 'A':
+            atm_menu(game);
+            break;
+        case KEY_UP:
+            selected = (selected == 0) ? 2 : (selected - 1);
+            break;
+        case KEY_DOWN:
+            selected = (selected + 1) % 3;
+            break;
+        case '\n':
+        case KEY_ENTER:
+            if (selected == 0) {
+                store_menu(game);
+            } else if (selected == 1) {
+                trade_menu(game, false);
+            } else {
+                atm_menu(game);
+            }
             break;
         case 27:
         case 'q':
@@ -2499,7 +2775,7 @@ static void title_screen(game_t *game) {
         mvprintw(6, 18, "First cut: trading, travel, prospecting, combat, saves.");
         mvprintw(8, 18, "High Scores");
         for (int i = 0; i < game->score_count && i < MAX_HIGH_SCORES; ++i) {
-            mvprintw(10 + i, 18, "%2d. %-12s %6d  %s",
+            mvprintw(10 + i, 18, "%2d. %-12.12s %6d  %.15s",
                      i + 1,
                      game->scores[i].name,
                      game->scores[i].score,
@@ -2526,8 +2802,6 @@ static void title_screen(game_t *game) {
                     game_init_new(game);
                     load_high_scores(game);
                     running = 0;
-                } else {
-                    game_log(game, "%s", error);
                 }
             } else {
                 game_log(game, "%s", error);
@@ -2555,7 +2829,7 @@ static void title_screen(game_t *game) {
  *   - int: Computed numeric result for this routine.
  */
 static int end_score_value(const game_t *game) {
-    return game->player.credits + market_estimate_cargo_value(game) + (game->turn * 10);
+    return game->player.credits + game->player.bank_balance + market_estimate_cargo_value(game) + (game->turn * 10);
 }
 
 /**
@@ -2642,7 +2916,7 @@ static void draw_liftoff_animation(const game_t *game) {
  */
 static void draw_end_stats_panel(const game_t *game, bool victory) {
     int cargo_value = market_estimate_cargo_value(game);
-    int total_wealth = game->player.credits + cargo_value;
+    int total_wealth = game->player.credits + game->player.bank_balance + cargo_value;
     int score = end_score_value(game);
     const char *title = victory ? "VICTORY" : "EPITAPH";
     const char *headline = victory ? "FREEBIRD HAS LEFT STARPORT" : "THE DUST CLAIMS ANOTHER TRADER";
@@ -2664,10 +2938,11 @@ static void draw_end_stats_panel(const game_t *game, bool victory) {
     draw_wrapped_text(game->end_reason, 6, 2, 76, 2, 0);
     mvprintw(9, 4, "Turns taken   : %d", game->turn);
     mvprintw(10, 4, "Wealth (cash) : %d Cr", game->player.credits);
-    mvprintw(11, 4, "Cargo value   : %d Cr", cargo_value);
-    mvprintw(12, 4, "Total wealth  : %d Cr", total_wealth);
-    mvprintw(14, 4, "SCORE         : %d pts", score);
-    mvprintw(15, 4, "(credits + cargo value + turns_survived x 10)");
+    mvprintw(11, 4, "Bank balance  : %d Cr", game->player.bank_balance);
+    mvprintw(12, 4, "Cargo value   : %d Cr", cargo_value);
+    mvprintw(13, 4, "Total wealth  : %d Cr", total_wealth);
+    mvprintw(15, 4, "SCORE         : %d pts", score);
+    mvprintw(16, 4, "(cash + bank + cargo value + turns_survived x 10)");
     mvprintw(17, 2, "%s", farewell);
     mvprintw(19, 2, "[ PRESS ANY KEY ]");
     refresh();
@@ -2766,16 +3041,14 @@ static void location_loop(game_t *game) {
     case 'm':
     case 'M':
         if (game->player.location == LOCATION_STARPORT) {
-            trade_menu(game, false);
-            store_menu(game);
+            trade_hub_menu(game);
         }
         break;
     case 's':
     case 'S':
         if (LOCATIONS[game->player.location].kind != LOCATION_KIND_WILDERNESS &&
             game->player.location != LOCATION_STARPORT) {
-            trade_menu(game, false);
-            store_menu(game);
+            trade_hub_menu(game);
         }
         break;
     case 'b':

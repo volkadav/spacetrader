@@ -144,6 +144,7 @@ typedef struct {
     int hp;
     int max_hp;
     int credits;
+    int bank_balance;
     int reputation;
     location_id_t location;
     weapon_t weapon;
