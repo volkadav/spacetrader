@@ -24,7 +24,7 @@ spacetrader: ${OBJ}
 	${CC} ${CFLAGS} ${CPPFLAGS} ${NCURSES_CFLAGS} -c $< -o $@
 
 clean:
-	rm -f ${OBJ} spacetrader
+	rm -f ${OBJ} spacetrader *.deb *.rpm nfpm.yaml.deb nfpm.yaml.rpm
 
 install: spacetrader
 	@bindir="${BINDIR}"; \
@@ -108,7 +108,4 @@ rpm: spacetrader nfpm.yaml.rpm
 
 pkg: deb rpm
 
-clean-pkg:
-	rm -f *.deb *.rpm nfpm.yaml.deb nfpm.yaml.rpm
-
-.PHONY: all clean install uninstall deb rpm pkg clean-pkg
+.PHONY: all clean install uninstall deb rpm pkg
