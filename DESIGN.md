@@ -104,6 +104,7 @@ road/trail network:
 ```
 
 Connections:
+
 - **Starport** ↔ Ashfield (N), Brokenhill (E), Millhaven (S), Coldwater (W)
 - **Ashfield** ↔ Starport, Dustwallow (NW), Ironpass (NE)
 - **Brokenhill** ↔ Starport, Ironpass (NW), Saltmarsh (SW)
@@ -136,6 +137,7 @@ settlement first.
 ### 3.3 Starport
 
 The Starport acts as the hub and is the most developed location.  It has:
+
 - A **Market** (shopkeeper intro/dialog first, then **Gear / Commodities / ATM**;
   broadest commodity selection, moderate prices; also sells the Cargo Hover)
 - A **Bar** (gambling, rumours)
@@ -157,6 +159,7 @@ Each of the four settlements has exactly three services:
 ### 3.5 Wilderness Areas
 
 Wilderness areas have no permanent services.  Each visit the player may:
+
 - **Prospect** — spend a turn searching for goods (see §6).
 - **Rest** — sleep rough for the night: recover **1 HP**, costs nothing.  Still rolls for
   a wilderness encounter (sleeping in the open is never fully safe).
@@ -172,6 +175,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **STARPORT**
+
 ```
         __|__
    --+--(___)--+--
@@ -182,6 +186,7 @@ These are shown in the main viewport and remain visible until the player takes a
   | MARKET | HOSP.  |
   '---------'-------'
 ```
+
 > The shadow of your impounded ship falls across the landing apron every morning —
 > a daily reminder of what you owe and what you stand to lose.  The Starport is the
 > beating heart of Kepler's Reach: loud, transactional, and indifferent.  Fuel-smell
@@ -191,6 +196,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **ASHFIELD** *(Settlement — North)*
+
 ```
   _____    _____    _____
  | . . |  | . . |  |     |
@@ -201,6 +207,7 @@ These are shown in the main viewport and remain visible until the player takes a
    | ASHFIELD CROSSING |
    '-------------------'
 ```
+
 > Rolling fields of pale grain stretch to the horizon under a flat grey sky.  A
 > cluster of low buildings — trading post, bar, whitewashed clinic — huddles at the
 > crossroads like settlers unsure whether to stay.  Farmhands move through the rows
@@ -210,6 +217,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **BROKENHILL** *(Settlement — East)*
+
 ```
     /\      /\      /\
    /  \    /##\    /  \
@@ -219,6 +227,7 @@ These are shown in the main viewport and remain visible until the player takes a
   | BROKENHILL WORKS Co. |
   '======================'
 ```
+
 > The hills here are honeycombed with shafts, and the settlement beneath them is
 > stained deep ochre from decades of ore dust.  Conveyor belts rattle overhead
 > between squat warehouses.  The workers look hard-used and say little to
@@ -228,6 +237,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **COLDWATER** *(Settlement — West)*
+
 ```
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ~  ~  RIVER CROSSING  ~  ~  ~  ~
@@ -238,6 +248,7 @@ These are shown in the main viewport and remain visible until the player takes a
     |  COLDWATER STATION  |
     '--------------------+'
 ```
+
 > Built at a broad river ford, Coldwater has always been a crossroads.  Goods
 > move through here from every direction and the locals have developed a
 > reputation for fair dealing and inflated self-importance in roughly equal
@@ -247,6 +258,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **MILLHAVEN** *(Settlement — South)*
+
 ```
    [SILO]   [SILO]   [SILO]
      ||        ||       ||
@@ -255,6 +267,7 @@ These are shown in the main viewport and remain visible until the player takes a
   |   COOPERATIVE FARMING   |
   +-------------------------+
 ```
+
 > A collective farming settlement in the flat southern lowlands.  Everything
 > is shared here, or so the locals insist.  They grow more food than they can
 > possibly eat and have little interest in much else.  The atmosphere is quiet
@@ -264,6 +277,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **DUSTWALLOW** *(Wilderness — Northwest)*
+
 ```
   ~  ~~ ~~~~  ~  ~~ ~~~~  ~
   ~~   ~~~~  ~~   ~~~~  ~~~
@@ -271,6 +285,7 @@ These are shown in the main viewport and remain visible until the player takes a
   ~~ ~~~~  ~~  ~ ~~~~  ~~ ~
   ~  ~~ ~~~~  ~  ~~ ~~~~  ~
 ```
+
 > The ground here is never quite solid.  Knee-high fog clings to the reed beds
 > and the twisted silhouettes of drowned trees.  Something large moves in the
 > murk to the north, unconcerned by your presence.  The air smells of rot and
@@ -281,6 +296,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **IRONPASS** *(Wilderness — Northeast)*
+
 ```
         /\          /\
        /  \  IRON  /  \
@@ -290,6 +306,7 @@ These are shown in the main viewport and remain visible until the player takes a
         ||    ||    ||
   ======++====++====++======
 ```
+
 > A narrow defile between two granite ridges, the only practical route through
 > the northeastern range.  The wind off the peaks is cold year-round and the
 > trail is littered with rusted detritus from previous expeditions.
@@ -299,6 +316,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **SALTMARSH** *(Wilderness — Southeast)*
+
 ```
   =-=-=-=-=-=-=-=-=-=-=-=-=-=
   |  ~~  ~~  ~~  ~~  ~~  ~~ |
@@ -307,6 +325,7 @@ These are shown in the main viewport and remain visible until the player takes a
   =-=-=-=-=-=-=-=-=-=-=-=-=-=
          OPEN COASTLINE
 ```
+
 > The coast here is a tangle of tidal channels, salt-bleached mangrove-analogues,
 > and the half-buried wreckage of craft that didn't make it to port.  Salvage
 > washes in on every tide — sometimes useful, sometimes not worth the smell.
@@ -317,6 +336,7 @@ These are shown in the main viewport and remain visible until the player takes a
 ---
 
 **THE BARRENS** *(Wilderness — Southwest)*
+
 ```
   .  .  .  .  .  .  .  .  .
    .   THE BARRENS    .   .
@@ -324,6 +344,7 @@ These are shown in the main viewport and remain visible until the player takes a
    . cracked clay . rock .
   .  .  .  .  .  .  .  .  .
 ```
+
 > A vast expanse of cracked clay and heat-shimmered rock, the Barrens are as
 > close to nothing as Kepler's Reach gets.  The sparse vegetation is thorned
 > and colourless.  The silence is thick enough to notice.  Deep below the
@@ -585,6 +606,7 @@ Reputation is modified by player actions:
 | Donate to clinic (optional)       | +1      |
 
 Reputation affects:
+
 - Bar NPC dialogue and brawl frequency.
 - Whether bandits demand a bribe or attack on sight.
 - Settlement clinic prices: **25 Cr/HP** normally, **20 Cr/HP** at reputation **≥ +2**.
@@ -603,11 +625,13 @@ Banked credits are separate from cash on hand.
 ATM access is available as option `3) ATM` inside Store/Market interaction.
 
 ATM screen shows:
+
 - Cash on hand
 - Bank account balance
 - Actions: `[D]eposit` and `[W]ithdraw`
 
 Rules:
+
 - Balances are always integer credits.
 - Deposit amount must be `0 < amount <= credits_on_hand`.
 - Withdraw amount must be `0 < amount <= bank_balance`.
@@ -615,6 +639,7 @@ Rules:
 - Any fractional credits produced by calculations are rounded down (floor).
 
 Interest:
+
 - Banked funds accrue **1% interest per eligible turn**.
 - Eligible turns are non-combat world turns that advance game time (e.g., location
   arrival/travel progression, prospecting, resting, and similar turn-consuming actions).
@@ -725,6 +750,7 @@ Roll 1d100 + `prospect_bonus` (see equipment):
 | 100+   | Artifact (unique item; very high value)            |
 
 Results are modified by location character:
+
 - **Dustwallow:** +10 to Furs, Medicinal Herbs; −10 to Raw Ore/Refined Metal
 - **Ironpass:** +15 to Raw Ore, Refined Metal, Gemstones; −10 to Food/Furs
 - **The Barrens:** +20 to Gemstones, Artifacts; +5 to Spices; nothing edible
@@ -739,6 +765,7 @@ If the player has no free cargo space, found goods are lost.
 ### 7.1 Road Encounters (Travel)
 
 Every time the player travels between locations, roll:
+
 - Base chance: **20%** on all roads.
 - Roads adjacent to wilderness areas: **35%**.
 
@@ -754,6 +781,7 @@ Every time the player travels between locations, roll:
 ### 7.2 Wilderness Encounters
 
 Every turn spent in a wilderness area (including prospecting) rolls:
+
 - Base chance: **50%**.
 
 | Roll (d10) | Wilderness Encounter        | Resolution                                        |
@@ -770,6 +798,7 @@ Every turn spent in a wilderness area (including prospecting) rolls:
 ### 7.3 Bar Encounters
 
 Entering the Bar always rolls for an optional event:
+
 - **30%** — Rumour available (price tip for one commodity at a named location)
 - **20%** — A local wants to brawl (player may accept, decline, or bet on the outcome)
 - **10%** — Mission offered (delivery or fetch quest; see §10)
@@ -933,6 +962,7 @@ Rumours are generated from actual current price data, giving true (if possibly s
 no questions asked.  This is the only legal outlet for Stolen Goods outside confiscation.
 
 **Brawls:** Another patron may challenge the player.  The player may:
+
 - **Accept** — fight; winner takes 10–50 cr from loser.  Losing damages HP.
 - **Decline** — reputation −0 (no penalty for declining a random brawl).
 - **Bet** — wager credits on yourself; double if you win; lose if you lose.
@@ -959,6 +989,7 @@ Standard blackjack rules (hit/stand/double; no split).  Dealer stands on soft 17
 European roulette (single zero, 1–36 + 0).  Chip minimum: 5 cr.
 
 Available bets:
+
 - **Straight up** (single number): pays 35:1
 - **Red/Black**: pays 1:1
 - **Odd/Even**: pays 1:1
@@ -988,6 +1019,7 @@ not the base reward (for delivery missions).  Failing an elimination mission has
 beyond lost time.
 
 Mission generation rules:
+
 - **Cargo Delivery** missions are generated against the player's **current free cargo
   space** when the mission board is entered, so no offered job is impossible to accept
   immediately.
@@ -1089,7 +1121,7 @@ FRAME 0 — Engines warming (exhaust glow only)
       [=]       [=]       [=]       [=]
       | |       | |       | |       | |
   ::::|:|::::::::|:|::::::::|:|::::::::|:|::::
-  ====[ LAUNCH PAD 4 — PORT VEGA STARPORT ]====
+  ====[ LAUNCH PAD 4 — KEPLER'S REACH STARPORT ]====
   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~
 ```
 
@@ -1106,7 +1138,7 @@ FRAME 1 — Lifting off (small exhaust burst)
       {*}       {*}       {*}       {*}
     *  }  *   *  }  *   *  }  *   *  }  *
    * * * * * * * * * * * * * * * * * * * *
-  ====[ LAUNCH PAD 4 — PORT VEGA STARPORT ]====
+  ====[ LAUNCH PAD 4 — KEPLER'S REACH STARPORT ]====
   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~   ~
 ```
 
@@ -1124,7 +1156,7 @@ FRAME 2 — Rising (exhaust plume growing)
       \\ //     \\ //     \\ //     \\ //
     *  \*/  *  *  \*/  *  *  \*/  *  *  \*/  *
    *  * | * *  *  * | * *  *  * | * *  *  * | *
-  ====[ LAUNCH PAD 4 — PORT VEGA STARPORT ]====
+  ====[ LAUNCH PAD 4 — KEPLER'S REACH STARPORT ]====
 ```
 
 ```
@@ -1140,7 +1172,7 @@ FRAME 3 — Climbing (ship smaller, plume spreading)
       *  *  *   *  *  *   *  *  *   *  *  *
     *    *    * *    *    * *    *    * *    *
    *  *   *  *   *  *  *   *  *   *  *   *  *
-  ====[ LAUNCH PAD 4 — PORT VEGA STARPORT ]====
+  ====[ LAUNCH PAD 4 — KEPLER'S REACH STARPORT ]====
 ```
 
 ```
@@ -1152,7 +1184,7 @@ FRAME 4 — Departing (ship tiny, exhaust fading)
           *   *   *       *   *   *
        *    *    *    * *    *    *    *
      *   *    *    *    *    *    *  *
-  ====[ LAUNCH PAD 4 — PORT VEGA STARPORT ]====
+  ====[ LAUNCH PAD 4 — KEPLER'S REACH STARPORT ]====
 ```
 
 ```
@@ -1163,7 +1195,7 @@ FRAME 5 — Gone (empty pad, starfield)
      *    ·    *    ·    *    ·    *    ·
   ·     *    ·     *      ·     *    ·     *
 
-  ====[ LAUNCH PAD 4 — PORT VEGA STARPORT ]====
+  ====[ LAUNCH PAD 4 — KEPLER'S REACH STARPORT ]====
               (the pad is empty)
 ```
 
