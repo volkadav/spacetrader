@@ -24,7 +24,7 @@ spacetrader: ${OBJ}
 	${CC} ${CFLAGS} ${CPPFLAGS} ${NCURSES_CFLAGS} -c $< -o $@
 
 clean:
-	rm -f ${OBJ} spacetrader *.deb *.rpm nfpm.yaml.deb nfpm.yaml.rpm
+	rm -f ${OBJ} spacetrader *.deb *.rpm nfpm-deb.yaml nfpm-rpm.yaml
 
 install: spacetrader
 	@bindir="${BINDIR}"; \
@@ -86,25 +86,25 @@ PKG_ARCH_DEB = $(shell dpkg --print-architecture 2>/dev/null || (uname -m | sed 
 PKG_ARCH_RPM = $(shell uname -m)
 NFPM = nfpm
 
-nfpm.yaml.deb: nfpm.yaml.in
+nfpm-deb.yaml: nfpm.yaml.in
 	@echo "Generating nfpm config (deb) for $(PKG_VERSION)..."
 	sed -e 's/@PKG_VERSION@/$(PKG_VERSION)/g' \
 	    -e 's/@PKG_ARCH@/$(PKG_ARCH_DEB)/g' \
 	    nfpm.yaml.in > $@
 
-nfpm.yaml.rpm: nfpm.yaml.in
+nfpm-rpm.yaml: nfpm.yaml.in
 	@echo "Generating nfpm config (rpm) for $(PKG_VERSION)..."
 	sed -e 's/@PKG_VERSION@/$(PKG_VERSION)/g' \
 	    -e 's/@PKG_ARCH@/$(PKG_ARCH_RPM)/g' \
 	    nfpm.yaml.in > $@
 
-deb: spacetrader nfpm.yaml.deb
+deb: spacetrader nfpm-deb.yaml
 	@command -v $(NFPM) >/dev/null 2>&1 || { echo "Error: nfpm is required to build .deb packages."; echo "Install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest"; exit 1; }
-	$(NFPM) package --packager deb -f nfpm.yaml.deb
+	$(NFPM) package --packager deb -f nfpm-deb.yaml
 
-rpm: spacetrader nfpm.yaml.rpm
+rpm: spacetrader nfpm-rpm.yaml
 	@command -v $(NFPM) >/dev/null 2>&1 || { echo "Error: nfpm is required to build .rpm packages."; echo "Install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest"; exit 1; }
-	$(NFPM) package --packager rpm -f nfpm.yaml.rpm
+	$(NFPM) package --packager rpm -f nfpm-rpm.yaml
 
 pkg: deb rpm
 

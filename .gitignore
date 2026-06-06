@@ -48,8 +48,8 @@ GNUmakefile
 # Packages
 *.deb
 *.rpm
-nfpm.yaml.deb
-nfpm.yaml.rpm
+nfpm-deb.yaml
+nfpm-rpm.yaml
 
 # Debug files
 *.dSYM/
