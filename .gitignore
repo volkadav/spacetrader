@@ -45,6 +45,12 @@ GNUmakefile
 *.x86_64
 *.hex
 
+# Packages
+*.deb
+*.rpm
+nfpm.yaml.deb
+nfpm.yaml.rpm
+
 # Debug files
 *.dSYM/
 *.su

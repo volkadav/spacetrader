@@ -81,4 +81,34 @@ uninstall:
 	target_man6dir="${DESTDIR}$$man6dir"; \
 	${RM} "$$target_bindir/spacetrader" "$$target_man6dir/spacetrader.6"
 
-.PHONY: all clean install uninstall
+PKG_VERSION = $(shell sed -n 's/.*SPACE_TRADER_VERSION *"\([^"]*\)".*/\1/p' version.h)
+PKG_ARCH_DEB = $(shell dpkg --print-architecture 2>/dev/null || (uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'))
+PKG_ARCH_RPM = $(shell uname -m)
+NFPM = nfpm
+
+nfpm.yaml.deb: nfpm.yaml.in
+	@echo "Generating nfpm config (deb) for $(PKG_VERSION)..."
+	sed -e 's/@PKG_VERSION@/$(PKG_VERSION)/g' \
+	    -e 's/@PKG_ARCH@/$(PKG_ARCH_DEB)/g' \
+	    nfpm.yaml.in > $@
+
+nfpm.yaml.rpm: nfpm.yaml.in
+	@echo "Generating nfpm config (rpm) for $(PKG_VERSION)..."
+	sed -e 's/@PKG_VERSION@/$(PKG_VERSION)/g' \
+	    -e 's/@PKG_ARCH@/$(PKG_ARCH_RPM)/g' \
+	    nfpm.yaml.in > $@
+
+deb: spacetrader nfpm.yaml.deb
+	@command -v $(NFPM) >/dev/null 2>&1 || { echo "Error: nfpm is required to build .deb packages."; echo "Install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest"; exit 1; }
+	$(NFPM) package --packager deb -f nfpm.yaml.deb
+
+rpm: spacetrader nfpm.yaml.rpm
+	@command -v $(NFPM) >/dev/null 2>&1 || { echo "Error: nfpm is required to build .rpm packages."; echo "Install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest"; exit 1; }
+	$(NFPM) package --packager rpm -f nfpm.yaml.rpm
+
+pkg: deb rpm
+
+clean-pkg:
+	rm -f *.deb *.rpm nfpm.yaml.deb nfpm.yaml.rpm
+
+.PHONY: all clean install uninstall deb rpm pkg clean-pkg

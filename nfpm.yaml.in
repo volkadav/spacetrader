@@ -1,0 +1,27 @@
+name: spacetrader
+arch: @PKG_ARCH@
+platform: linux
+version: @PKG_VERSION@
+section: games
+priority: optional
+maintainer: Michael Jackson <michael.o.jackson@gmail.com>
+description: |
+  A simple TUI space trading/adventure game where you take the role
+  of a down on their luck merchant adventurer trying to raise cash
+  to get their starship out of the impound lot of the starport on
+  an outlying colony world, Kepler's Reach.
+vendor: spacetrader
+license: BSD-3-Clause
+overrides:
+  deb:
+    depends:
+      - libncurses6
+  rpm:
+    depends:
+      - ncurses-libs
+
+contents:
+  - src: ./spacetrader
+    dst: /usr/games/spacetrader
+  - src: ./spacetrader.6
+    dst: /usr/share/man/man6/spacetrader.6
