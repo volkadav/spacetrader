@@ -35,6 +35,7 @@ Tested on:
     - arm64
         - Debian 13/Trixie (stable)
         - OpenBSD 7.9
+        - MacOS Sequoia (15.7.7 w/ homebrew, xcode cli tools etc.)
 
 (The code here is not that complex, so I suspect that most any POSIX-y platform with a working C99
 compiler and ncurses available will work.)

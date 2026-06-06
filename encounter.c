@@ -166,9 +166,18 @@ void encounter_on_wilderness_turn(game_t *game) {
 
     roll = rng_range(game, 1, 10);
     if (game->player.has_lucky_charm) {
-        roll = clamp_int(roll + 1, 1, 10);
+        int second = rng_range(game, 1, 10);
+        if (second > roll) {
+            roll = second;
+        }
     }
 
+    /*
+     * Wilderness encounter outcomes, ordered from most-negative (lowest
+     * roll) to most-positive (highest roll).  The lucky charm operates by
+     * taking the better of two independent rolls, so this ordering ensures
+     * that "better" consistently means "safer / more rewarding".
+     */
     switch (roll) {
     case 1:
     case 2:
@@ -186,9 +195,6 @@ void encounter_on_wilderness_turn(game_t *game) {
         }
         break;
     case 5:
-        grant_abandoned_cargo(game);
-        break;
-    case 6:
         if (game->player.cargo_count > 0) {
             cargo_stack_t stack = game->player.cargo[rng_range(game, 0, game->player.cargo_count - 1)];
             player_remove_cargo(&game->player, stack.commodity, 1);
@@ -205,7 +211,22 @@ void encounter_on_wilderness_turn(game_t *game) {
             }
         }
         break;
+    case 6:
+        if (rng_chance(game, 50)) {
+            game_log(game, "You skirt a sinkhole at the last moment.");
+        } else {
+            int damage = rng_range(game, 1, 2);
+            game->player.hp -= damage;
+            game_log(game, "Bad water and worse luck cost you %d HP.", damage);
+            if (game->player.hp <= 0) {
+                game_set_game_over(game, "The wilderness finally claimed you.");
+            }
+        }
+        break;
     case 7:
+        game_log(game, "The turn passes without incident.");
+        break;
+    case 8:
         if (rng_range(game, 1, 6) >= rng_range(game, 1, 6)) {
             game->prospect_bonus += 10;
             game_log(game, "You outwork a rival prospector. Next prospect roll gains +10.");
@@ -213,7 +234,7 @@ void encounter_on_wilderness_turn(game_t *game) {
             game_log(game, "A rival prospector strips the obvious seams before you can.");
         }
         break;
-    case 8:
+    case 9:
         if (game->player.bandages > 0) {
             game->player.bandages--;
             game->player.reputation++;
@@ -226,20 +247,8 @@ void encounter_on_wilderness_turn(game_t *game) {
             game_log(game, "You find an injured traveller and can only wish them luck.");
         }
         break;
-    case 9:
-        if (rng_chance(game, 50)) {
-            game_log(game, "You skirt a sinkhole at the last moment.");
-        } else {
-            int damage = rng_range(game, 1, 2);
-            game->player.hp -= damage;
-            game_log(game, "Bad water and worse luck cost you %d HP.", damage);
-            if (game->player.hp <= 0) {
-                game_set_game_over(game, "The wilderness finally claimed you.");
-            }
-        }
-        break;
     default:
-        game_log(game, "The turn passes without incident.");
+        grant_abandoned_cargo(game);
         break;
     }
 }

@@ -41,10 +41,10 @@ static const int LOCATION_MODIFIERS[MAX_LOCATIONS][NUM_COMMODITIES] = {
     [LOCATION_COLDWATER] = {
         100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100
     },
-    [LOCATION_DUSTWALLOW] = {100},
-    [LOCATION_IRONPASS] = {100},
-    [LOCATION_SALTMARSH] = {100},
-    [LOCATION_BARRENS] = {100}
+    [LOCATION_DUSTWALLOW] = {100},    /* remaining entries default to 0; wilderness has no market */
+    [LOCATION_IRONPASS] = {100},      /* remaining entries default to 0; wilderness has no market */
+    [LOCATION_SALTMARSH] = {100},     /* remaining entries default to 0; wilderness has no market */
+    [LOCATION_BARRENS] = {100}        /* remaining entries default to 0; wilderness has no market */
 };
 
 static const int BASELINE_STOCKS[MAX_LOCATIONS][NUM_COMMODITIES] = {

@@ -2,7 +2,6 @@
 #include "save.h"
 
 #include <errno.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -89,12 +88,14 @@ static bool save_path_directory(const char *path, char *directory, size_t direct
 
     slash = strrchr(path, '/');
     if (slash == NULL) {
-        return snprintf(directory, directory_size, ".") < (int)directory_size;
+        int result = snprintf(directory, directory_size, ".");
+        return result >= 0 && result < (int)directory_size;
     }
 
     prefix_len = (size_t)(slash - path);
     if (prefix_len == 0) {
-        return snprintf(directory, directory_size, "/") < (int)directory_size;
+        int result = snprintf(directory, directory_size, "/");
+        return result >= 0 && result < (int)directory_size;
     }
     if (prefix_len >= directory_size) {
         return false;
