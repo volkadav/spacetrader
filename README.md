@@ -1,5 +1,7 @@
 # spacetrader
 
+![Screenshot](spacetrader_screenshot.png)
+
 A simple TUI space trading/adventure game where you take the role of a down on their
 luck merchant adventurer trying to raise cash to get their starship out of the impound
 lot of the starport on an outlying colony world, Kepler's Reach.
