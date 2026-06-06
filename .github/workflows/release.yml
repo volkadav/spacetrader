@@ -33,8 +33,7 @@ jobs:
       - name: Install nfpm
         run: |
           NFPM_VER=2.46.3
-          curl -sSfLO "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VER}/nfpm_${NFPM_VER}_linux_${{ matrix.arch }}.deb"
-          dpkg -i "nfpm_${NFPM_VER}_linux_${{ matrix.arch }}.deb"
+          curl -sSfL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VER}/nfpm_${NFPM_VER}_Linux_${{ matrix.arch == 'amd64' && 'x86_64' || 'arm64' }}.tar.gz" | tar xzf - -C /usr/local/bin nfpm
           nfpm --version
 
       - name: Configure and build
