@@ -11,6 +11,7 @@ lot of the starport on an outlying colony world, Kepler's Reach.
 - a working C99 compiler
 - gnu make
 - ncurses (library and headers)
+- nfpm (if you want to build deb/rpm packages)
 
 ```sh
 ./configure
@@ -60,6 +61,10 @@ To remove installed files:
 ```sh
 make uninstall
 ```
+
+### Making deb/rpm packages
+
+`make pkg`. You must have `nfpm` in your path.
 
 ## Authors and License
 

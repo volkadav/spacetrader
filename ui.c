@@ -60,28 +60,28 @@ static const npc_dialogue_t BAR_NPCS[MAX_LOCATIONS] = {
     [LOCATION_STARPORT] =
         {"Mags", "You look like trouble. Drink fast and don't start anything.",
          "What'll it be? And don't lean on the bar.",
-         "There you are. Usual spot's free. First one's on the house tonight."},
+         "There you are. Usual spot's free. First one's on the house tonight.", NULL},
     [LOCATION_ASHFIELD] = {"Old Henk",
                            "You're new. That's fine. Keep your hands where I "
                            "can see 'em, that's all I ask.",
                            "Pull up a stool, friend. What can I get you?",
                            "Ha! Look who's back. Sit down, sit down - I saved "
-                           "you some of the good batch."},
+                           "you some of the good batch.", NULL},
     [LOCATION_BROKENHILL] =
         {"Rook", "Pay first. Drink. Leave. That's the whole arrangement.",
          "What do you want?",
-         "Good to see a straight face in here. The usual?"},
+         "Good to see a straight face in here. The usual?", NULL},
     [LOCATION_COLDWATER] =
         {"Lena Vasquez",
          "A quiet bar is a good bar. You seem like you might complicate that.",
          "What can I get you?",
          "I heard something you might find useful. Drink first - then we'll "
-         "talk."},
+         "talk.", NULL},
     [LOCATION_MILLHAVEN] = {
         "Cam", "We serve everyone here. I didn't say we trusted everyone.",
         "Evening. What do you need?",
         "Good to have you in. The harvest batch just came through - it's "
-        "better than last year."}};
+        "better than last year.", NULL}};
 
 static const npc_dialogue_t HEAL_NPCS[MAX_LOCATIONS] = {
     [LOCATION_STARPORT] = {"Dr. Ananya Patel",
@@ -89,32 +89,32 @@ static const npc_dialogue_t HEAL_NPCS[MAX_LOCATIONS] = {
                            "converse with everyone.",
                            "Where does it hurt? How long ago? Sit down.",
                            "You again. Let me take a look - and try to avoid "
-                           "whatever caused this."},
+                           "whatever caused this.", NULL},
     [LOCATION_ASHFIELD] = {"Nurse Sera Yun",
                            "I'll treat you because that's my job. Don't make "
                            "it harder than it has to be.",
                            "Come in, sit there. Tell me what happened.",
                            "Glad you came in before it got worse. Let me sort "
-                           "this out - and I'll keep the fee reasonable."},
+                            "this out - and I'll keep the fee reasonable.", NULL},
     [LOCATION_BROKENHILL] =
         {"Doc Ferris",
          "I patch up anyone who comes through that door. Doesn't mean I have "
          "to like it.",
          "Sit down. This won't take long.",
          "Ah, you again. Still getting into scrapes. Let me take a look - I'll "
-         "charge you the workers' rate."},
+          "charge you the workers' rate.", NULL},
     [LOCATION_COLDWATER] =
         {"Sister Brynn",
          "Healing is given freely. Whether I do it warmly depends on you.",
          "Come in, sit down. Let me see what we're working with.",
          "Back again - I'm glad you know where to come. I'll put the kettle "
-         "on."},
+         "on.", NULL},
     [LOCATION_MILLHAVEN] = {"Elder Maris",
                             "I heal who comes to me. I don't ask questions. I "
                             "do ask that you return the favour.",
                             "What happened, and when? Give me the facts.",
                             "Sit, sit. You look like you've earned a proper "
-                            "rest. I'll see to this."}};
+                             "rest. I'll see to this.", NULL}};
 
 static const npc_dialogue_t TRADE_NPCS[MAX_LOCATIONS] = {
     [LOCATION_STARPORT] =
