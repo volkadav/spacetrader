@@ -63,7 +63,8 @@ static int score_value(const game_t *game) {
  *   - bool: True when the operation succeeds or the condition is met; false otherwise.
  */
 static bool append_suffix(const char *path, const char *suffix, char *buffer, size_t buffer_size) {
-    return snprintf(buffer, buffer_size, "%s%s", path, suffix) < (int)buffer_size;
+    int result = snprintf(buffer, buffer_size, "%s%s", path, suffix);
+    return result >= 0 && result < (int)buffer_size;
 }
 
 /**
@@ -355,7 +356,7 @@ bool save_game(const game_t *game, char *error_buffer, size_t error_buffer_size)
     memset(&blob, 0, sizeof(blob));
     blob.magic = SAVE_MAGIC;
     blob.version = SAVE_VERSION;
-    blob.game = *game;
+    blob.game = *game; /* safe: game_t has no heap-allocated pointers */
     blob.checksum = crc32_bytes(&blob.game, sizeof(blob.game));
 
     if (fwrite(&blob, sizeof(blob), 1, fp) != 1) {

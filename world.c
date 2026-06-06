@@ -147,9 +147,6 @@ bool world_are_connected(location_id_t from, location_id_t to) {
             return true;
         }
     }
-    if (from == LOCATION_STARPORT && to == LOCATION_COLDWATER) {
-        return true;
-    }
     return false;
 }
 

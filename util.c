@@ -61,7 +61,11 @@ uint32_t rng_next(game_t *game) {
  *   - int: Computed numeric result for this routine.
  */
 int rng_range(game_t *game, int min_value, int max_value) {
-    uint32_t span = (uint32_t)(max_value - min_value + 1);
+    uint32_t span;
+    if (min_value >= max_value) {
+        return min_value;
+    }
+    span = (uint32_t)((long)max_value - (long)min_value) + 1U;
     return min_value + (int)(rng_next(game) % span);
 }
 
@@ -228,8 +232,6 @@ bool home_file_path(const char *filename, char *buffer, size_t buffer_size) {
         return false;
     }
 
-    if (snprintf(buffer, buffer_size, "%s/%s", home, filename) >= (int)buffer_size) {
-        return false;
-    }
-    return true;
+    int result = snprintf(buffer, buffer_size, "%s/%s", home, filename);
+    return result >= 0 && result < (int)buffer_size;
 }
