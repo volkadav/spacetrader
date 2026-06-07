@@ -146,7 +146,6 @@ typedef struct {
     int credits;
     int bank_balance;
     int reputation;
-    int wanted_level;
     location_id_t location;
     weapon_t weapon;
     armor_t armor;
@@ -161,6 +160,7 @@ typedef struct {
     bool has_hover;
     cargo_stack_t cargo[MAX_CARGO_STACKS];
     int cargo_count;
+    int wanted_level;
 } player_t;
 
 typedef struct {
