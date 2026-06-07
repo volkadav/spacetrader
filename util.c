@@ -144,6 +144,9 @@ void game_advance_turn(game_t *game) {
     game->turn++;
     apply_bank_interest(game);
     world_decay_drops(game);
+    if (game->player.wanted_level > 0 && (game->turn % 5) == 0) {
+        game->player.wanted_level--;
+    }
 }
 
 /**
@@ -163,6 +166,8 @@ void game_init_new(game_t *game) {
     game->rng_state = (uint32_t)time(NULL) ^ (uint32_t)getpid();
     game->running = true;
     game->state = GAME_STATE_LOCATION;
+    game->stash_rumor_active = false;
+    game->pending_bribe = false;
     player_init(&game->player);
     market_init_all(game);
     world_arrive(game, LOCATION_STARPORT, false);

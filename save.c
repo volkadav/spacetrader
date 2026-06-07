@@ -12,7 +12,7 @@
 #include "util.h"
 
 #define SAVE_MAGIC 0x53504143u
-#define SAVE_VERSION 2u
+#define SAVE_VERSION 3u
 #define SCORE_MAGIC 0x53545253u
 #define SCORE_VERSION 1u
 #define SAVE_FILENAME ".spacetrader.sav"
@@ -24,6 +24,13 @@
 
 static char save_path_override[PATH_MAX];
 static bool save_path_override_set = false;
+
+typedef struct {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t reserved;
+    uint32_t checksum;
+} save_header_t;
 
 typedef struct {
     uint32_t magic;
@@ -226,6 +233,9 @@ static void sanitize_loaded_game(game_t *game) {
     game->running = !!game->running;
     game->player_won = !!game->player_won;
     game->score_recorded = !!game->score_recorded;
+    game->stash_rumor_active = !!game->stash_rumor_active;
+    game->pending_bribe = !!game->pending_bribe;
+    game->player.wanted_level = clamp_int(game->player.wanted_level, 0, 5);
 
     cargo_count = clamp_int(game->player.cargo_count, 0, MAX_CARGO_STACKS);
     for (int i = 0; i < cargo_count; ++i) {
@@ -382,8 +392,11 @@ save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buff
     char path[PATH_MAX];
     char backup_path[PATH_MAX + 32];
     FILE *fp;
-    save_blob_t blob;
+    save_header_t header;
     bool archived;
+    long file_size;
+    long game_data_size;
+    uint32_t game_checksum;
 
     if (!resolve_save_path(path, sizeof(path))) {
         snprintf(error_buffer, error_buffer_size, "Could not determine save path.");
@@ -394,38 +407,74 @@ save_load_result_t load_game(game_t *game, char *error_buffer, size_t error_buff
         snprintf(error_buffer, error_buffer_size, "No save file found.");
         return SAVE_LOAD_NOT_FOUND;
     }
-    if (fread(&blob, sizeof(blob), 1, fp) != 1) {
+
+    if (fread(&header, sizeof(header), 1, fp) != 1) {
         fclose(fp);
         archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
-        if (archived) {
-            snprintf(error_buffer, error_buffer_size, "Save is unreadable and was moved to %s.", backup_path);
-        } else {
-            snprintf(error_buffer, error_buffer_size, "Save is unreadable and could not be archived.");
-        }
+        snprintf(error_buffer, error_buffer_size,
+                 archived ? "Save header is unreadable; moved to %s." : "Save header is unreadable.",
+                 archived ? backup_path : "");
+        return SAVE_LOAD_CORRUPT;
+    }
+
+    if (header.magic != SAVE_MAGIC) {
+        fclose(fp);
+        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
+        snprintf(error_buffer, error_buffer_size,
+                 archived ? "Not a valid save file; moved to %s." : "Not a valid save file.",
+                 archived ? backup_path : "");
+        return SAVE_LOAD_CORRUPT;
+    }
+
+    if (header.version != 2 && header.version != 3) {
+        fclose(fp);
+        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
+        snprintf(error_buffer, error_buffer_size,
+                 archived ? "Unknown save version %u; moved to %s." : "Unknown save version %u.",
+                 header.version, archived ? backup_path : "");
+        return SAVE_LOAD_CORRUPT;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    file_size = ftell(fp);
+    if (file_size < 0) {
+        file_size = 0;
+    }
+    game_data_size = file_size - (long)sizeof(header);
+    if (game_data_size <= 0 || game_data_size > (long)sizeof(game_t)) {
+        fclose(fp);
+        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
+        snprintf(error_buffer, error_buffer_size,
+                 archived ? "Save game data has bad size; moved to %s." : "Save game data has bad size.",
+                 archived ? backup_path : "");
+        return SAVE_LOAD_CORRUPT;
+    }
+
+    fseek(fp, (long)sizeof(header), SEEK_SET);
+    memset(game, 0, sizeof(*game));
+    if (fread(game, (size_t)game_data_size, 1, fp) != 1) {
+        fclose(fp);
+        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
+        snprintf(error_buffer, error_buffer_size,
+                 archived ? "Could not read save game data; moved to %s." : "Could not read save game data.",
+                 archived ? backup_path : "");
         return SAVE_LOAD_CORRUPT;
     }
     fclose(fp);
 
-    if (blob.magic != SAVE_MAGIC || blob.version != (uint16_t)SAVE_VERSION) {
+    game_checksum = crc32_bytes(game, (size_t)game_data_size);
+    if (header.checksum != game_checksum) {
         archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
-        if (archived) {
-            snprintf(error_buffer, error_buffer_size, "Save version mismatch; moved to %s.", backup_path);
-        } else {
-            snprintf(error_buffer, error_buffer_size, "Save version mismatch and could not be archived.");
-        }
-        return SAVE_LOAD_CORRUPT;
-    }
-    if (blob.checksum != crc32_bytes(&blob.game, sizeof(blob.game))) {
-        archived = archive_corrupt_save(path, backup_path, sizeof(backup_path));
-        if (archived) {
-            snprintf(error_buffer, error_buffer_size, "Save checksum failed; moved to %s.", backup_path);
-        } else {
-            snprintf(error_buffer, error_buffer_size, "Save checksum failed and could not be archived.");
-        }
+        snprintf(error_buffer, error_buffer_size,
+                 archived ? "Save checksum failed; moved to %s." : "Save checksum failed.",
+                 archived ? backup_path : "");
         return SAVE_LOAD_CORRUPT;
     }
 
-    *game = blob.game;
+    if (header.version == 2) {
+        game_log(game, "Save upgraded from v2 to v3.");
+    }
+
     sanitize_loaded_game(game);
     game->running = true;
     return SAVE_LOAD_OK;

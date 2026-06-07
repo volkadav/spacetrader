@@ -146,6 +146,7 @@ typedef struct {
     int credits;
     int bank_balance;
     int reputation;
+    int wanted_level;
     location_id_t location;
     weapon_t weapon;
     armor_t armor;
@@ -178,6 +179,11 @@ typedef struct {
     news_log_t log;
     high_score_t scores[MAX_HIGH_SCORES];
     int score_count;
+    bool stash_rumor_active;
+    location_id_t stash_location;
+    commodity_id_t stash_commodity;
+    bool pending_bribe;
+    int bribe_amount;
 } game_t;
 
 extern const commodity_def_t COMMODITIES[NUM_COMMODITIES];

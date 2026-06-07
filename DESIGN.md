@@ -602,7 +602,7 @@ Reputation is modified by player actions:
 | Win a fair fight in the Bar       | +1      |
 | Rob / attack a neutral NPC        | −2      |
 | Caught cheating at gambling       | −1      |
-| Caught carrying contraband        | −1      |
+| Caught carrying contraband (refuse bribe) | −1 (+1 wanted level) |
 | Donate to clinic (optional)       | +1      |
 
 Reputation affects:
@@ -614,6 +614,7 @@ Reputation affects:
   reduced by **5%** at reputation **≥ +2** (rounded down to whole credits).  Sell prices
   are unchanged.  High-reputation "reserved stock" dialogue is flavour only in v0.1.
 - Hospital prices are fixed (no reputation discount).
+- **Wanted level** (0–5) decays by 1 every 5 turns and increases road patrol encounter frequency.
 
 ---
 
@@ -718,14 +719,40 @@ selling increases it.  Stock drifts back toward a location baseline at ~3 units 
 A commodity with `stock = 0` cannot be purchased.  A flooded commodity (stock at maximum)
 pays poorly.
 
-### 5.5 Contraband
+### 5.5 Contraband & Wanted Level
 
-Narcotics and Stolen Goods cannot be bought or sold at legitimate Stores.  They may only
-be obtained via wilderness encounters or the Bar's back-room fence.  If the player is caught
-carrying contraband by a **road patrol encounter**, all contraband is confiscated and a
-fine equal to the **total base value** of the seized goods is levied (**minimum 100 Cr**,
-rounded up to the next 10 Cr).  If the player cannot pay in full, the patrol seizes all
-cash on hand instead.
+Narcotics and Stolen Goods are illegal everywhere.  They cannot be bought or sold at
+legitimate Stores or Markets.  The Bar's back-room **Fence** will buy and sell Narcotics
+and Stolen Goods at varying prices depending on location:
+
+| Location   | Fence Buys (player sells) | Fence Sells Narcotics | Fence Sells Stolen Goods |
+|------------|--------------------------|-----------------------|---------------------------|
+| Starport   | 70% base price           | 110% base price       | 80% base price            |
+| Settlements| 70% base price           | 130% base price       | 90% base price            |
+
+Artifacts may only be **sold to** the fence (70% base).  The fence will not sell artifacts.
+
+**Wanted Level:**
+Every time the player is caught with contraband by a road patrol and refuses (or cannot
+afford) a bribe, their `wanted_level` increases by 1 (maximum 5).  Wanted level decays
+by 1 every 5 turns.  Higher wanted makes road patrols more frequent.
+
+**Bribery:**
+When a road patrol detects contraband, the patrol leader offers to "look the other way"
+for a bribe equal to the total base value of the contraband (minimum 100 Cr, rounded up
+to the nearest 10 Cr).  Paying the bribe keeps the goods and prevents any wanted-level
+increase.  Refusing results in confiscation, a fine equal to the bribe amount,
+-1 reputation, and +1 wanted level.
+
+**Combat Loot:**
+Defeating muggers (30% chance) and bandits or bandit leaders (30% + 20% chance) may
+yield 1 unit of Stolen Goods or Narcotics respectively in addition to credit bounties.
+
+**Stash Rumours:**
+The barkeep may sell a stash tip for 15 credits, revealing the location of a hidden
+cache of Narcotics or Stolen Goods in a specific wilderness area.  While in that area,
+each wilderness turn has a 30% chance of discovering the stash (1 unit of the rumoured
+commodity).  Once found, the rumour is cleared.
 
 ---
 
@@ -771,7 +798,7 @@ Every time the player travels between locations, roll:
 
 | Roll (d6) | Road Encounter             | Resolution                                    |
 |-----------|----------------------------|----------------------------------------------|
-| 1         | Road patrol (law officers) | Inspect cargo; confiscate contraband and levy fine if found |
+| 1         | Road patrol (law officers) | Inspect cargo; offer bribe to keep contraband, otherwise confiscate + fine + wanted |
 | 2         | Travelling merchant        | Buy/sell 1–2 items at random prices          |
 | 3         | Mugger                     | Combat or flee or surrender (lose 10–30 cr)  |
 | 4         | Lost traveller             | Reputation +1 for helping; ignore = nothing  |
@@ -788,7 +815,7 @@ Every turn spent in a wilderness area (including prospecting) rolls:
 |------------|-----------------------------|----------------------------------------------------|
 | 1–2        | Aggressive wildlife         | Combat (flee possible; animals do not bribe)       |
 | 3–4        | Bandits                     | Combat, flee, or bribe (10–40 cr or % of cargo)   |
-| 5          | Abandoned cargo             | Free goods (1–2 non-bulk units, or 1 bulk-good unit)|
+| 5          | Abandoned cargo / Stash find | Free goods (1–2 non-bulk units, or 1 bulk-good unit); or find a rumoured stash |
 | 6          | Rockslide / flash flood     | Lose 0–2 units of carried cargo; possible 1 HP dmg|
 | 7          | Rival prospector            | Compete: both roll d6; winner gets +10 to prospect |
 | 8          | Injured traveller           | Help (reputation +1, cost 0–20 cr) or ignore      |
@@ -803,6 +830,9 @@ Entering the Bar always rolls for an optional event:
 - **20%** — A local wants to brawl (player may accept, decline, or bet on the outcome)
 - **10%** — Mission offered (delivery or fetch quest; see §10)
 - **Remainder** — Quiet evening; just gambling available
+
+The player may also purchase market rumours (10 Cr), stash tips (15 Cr, see §5.5), or
+access the back-room fence.
 
 ---
 
@@ -954,12 +984,15 @@ The Bar exists at every settlement and at the Starport.
 > *"Brokenhill's short on food — I heard they're paying triple for grain this week."*
 
 Rumours are generated from actual current price data, giving true (if possibly stale) intel.
+The player may also purchase a market rumour for 10 credits at any time, or a **stash tip**
+for 15 credits revealing a hidden contraband cache in a wilderness area.
 
 **Rent a room:** The player may pay **20 cr** to rent a room for the night, restoring
 **2 HP**.  This is safe (no encounter roll) and available at every Bar.
 
-**Fence:** The Bar's back room will buy Stolen Goods and Artifacts at 70% of base price,
-no questions asked.  This is the only legal outlet for Stolen Goods outside confiscation.
+**Fence:** The Bar's back room buys and sells contraband without questions.
+- **Buys from player** (sell to fence): Stolen Goods, Narcotics, and Artifacts at 70% of base price.
+- **Sells to player** (buy from fence): Narcotics at 110% base (Starport) or 130% base (settlements); Stolen Goods at 80% base (Starport) or 90% base (settlements).  Artifacts cannot be purchased from the fence.
 
 **Brawls:** Another patron may challenge the player.  The player may:
 
@@ -1349,4 +1382,4 @@ Implementation gaps to close against this design:
 
 ---
 
-*End of Design Document — v0.1*
+*End of Design Document — v0.4.0-beta*

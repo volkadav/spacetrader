@@ -1055,6 +1055,9 @@ static void draw_base_frame(const game_t *game, const char *commands) {
   mvprintw(0, 38, "Credits: %d", game->player.credits);
   mvprintw(0, 54, "Bank: %d", game->player.bank_balance);
   mvprintw(0, 69, "Rep: %d", game->player.reputation);
+  if (game->player.wanted_level > 0) {
+    mvprintw(0, 74, "WANTED:%d", game->player.wanted_level);
+  }
   ui_draw_horizontal_separator(20, 0, 79, '-');
   ui_draw_vertical_separator(LEFT_WIDTH, 1, 20, '|');
   mvaddch(20, LEFT_WIDTH, '+');
@@ -1351,7 +1354,7 @@ static void trade_menu(game_t *game, bool fence) {
   while (running) {
     draw_base_frame(
         game,
-        fence ? "[Up/Down] [PgUp/PgDn] [S]ell one [A]ll [Esc]"
+        fence ? "[Up/Down] [PgUp/PgDn] [B]uy [M]ax buy [S]ell one [A]ll [Esc]"
               : "[Up/Down] [PgUp/PgDn] [B]uy one [M]ax [S]ell one [A]ll [Esc]");
     mvprintw(2, 2, fence ? "Back-room Fence" : "Commodity Market");
     if (option_count == 0) {
@@ -1392,7 +1395,7 @@ static void trade_menu(game_t *game, bool fence) {
       int commodity_index = options[top + row];
       int own =
           player_cargo_quantity(&game->player, (commodity_id_t)commodity_index);
-      int price = market_fence_price((commodity_id_t)commodity_index);
+      int price = 0;
       int stock = game->markets[game->player.location].stock[commodity_index];
       char line[LOG_LINE_LENGTH];
 
@@ -1406,8 +1409,10 @@ static void trade_menu(game_t *game, bool fence) {
         snprintf(line, sizeof(line), "%-18.18s %4d cr  st:%2d own:%2d",
                  COMMODITIES[commodity_index].name, price, stock, own);
       } else {
-        snprintf(line, sizeof(line), "%-18.18s %4d cr  own:%2d",
-                 COMMODITIES[commodity_index].name, price, own);
+        int buy_price = market_fence_buy_price(game->player.location, (commodity_id_t)commodity_index);
+        int sell_price = market_fence_price(game->player.location, (commodity_id_t)commodity_index);
+        snprintf(line, sizeof(line), "%-18.18s buy:%4d sell:%4d own:%2d",
+                 COMMODITIES[commodity_index].name, buy_price, sell_price, own);
       }
 
       if ((top + row) == selected) {
@@ -1439,14 +1444,21 @@ static void trade_menu(game_t *game, bool fence) {
       break;
     case 'b':
     case 'B':
-      if (!fence) {
+      if (fence) {
+        market_fence_buy(game, game->player.location,
+                         (commodity_id_t)options[selected], 1);
+      } else {
         market_buy(game, game->player.location,
                    (commodity_id_t)options[selected], 1);
       }
       break;
     case 'm':
     case 'M':
-      if (!fence) {
+      if (fence) {
+        while (market_fence_buy(game, game->player.location,
+                                (commodity_id_t)options[selected], 1)) {
+        }
+      } else {
         while (market_buy(game, game->player.location,
                           (commodity_id_t)options[selected], 1)) {
         }
@@ -1455,13 +1467,8 @@ static void trade_menu(game_t *game, bool fence) {
     case 's':
     case 'S':
       if (fence) {
-        if (player_remove_cargo(&game->player,
-                                (commodity_id_t)options[selected], 1)) {
-          int payout = market_fence_price((commodity_id_t)options[selected]);
-          game->player.credits += payout;
-          game_log(game, "Fenced 1 x %s for %d cr.",
-                   COMMODITIES[options[selected]].name, payout);
-        }
+        market_fence_sell(game, game->player.location,
+                          (commodity_id_t)options[selected], 1);
       } else {
         market_sell(game, game->player.location,
                     (commodity_id_t)options[selected], 1);
@@ -1473,12 +1480,8 @@ static void trade_menu(game_t *game, bool fence) {
                                       (commodity_id_t)options[selected]);
       if (qty > 0) {
         if (fence) {
-          player_remove_cargo(&game->player, (commodity_id_t)options[selected],
-                              qty);
-          game->player.credits +=
-              market_fence_price((commodity_id_t)options[selected]) * qty;
-          game_log(game, "Fenced %d x %s.", qty,
-                   COMMODITIES[options[selected]].name);
+          market_fence_sell(game, game->player.location,
+                            (commodity_id_t)options[selected], qty);
         } else {
           market_sell(game, game->player.location,
                       (commodity_id_t)options[selected], qty);
@@ -2595,20 +2598,21 @@ static void bar_menu(game_t *game) {
   const char *bar_line = npc_dialogue_line(bar_npc, game->player.reputation);
   char bar_speaker[LOG_LINE_LENGTH];
   char bar_quote[LOG_LINE_LENGTH];
-  static const char *bar_options =
-      "Room [R]: 20 cr for +2 HP\n"
-      "Fence [F]: contraband and artifacts at 70% of base price\n"
-      "Rumors [U]: buy a local rumor for 10 credits\n"
-      "Brawl [B]: straight-up fistfight for local cash\n"
-      "Blackjack [J]: min 5, max 500, dealer stands on soft 17\n"
-      "Roulette [O]: European wheel, max 200 per spin";
+    static const char *bar_options =
+        "Room [R]: 20 cr for +2 HP\n"
+        "Fence [F]: buy/sell narcotics, stolen goods, artifacts\n"
+        "Rumors [U]: buy a market rumor for 10 credits\n"
+        "Stash tip [T]: buy a stash location for 15 credits\n"
+        "Brawl [B]: straight-up fistfight for local cash\n"
+        "Blackjack [J]: min 5, max 500, dealer stands on soft 17\n"
+        "Roulette [O]: European wheel, max 200 per spin";
 
   format_npc_speaker(bar_npc, "bartender", bar_speaker, sizeof(bar_speaker));
   format_npc_quote(bar_line, bar_quote, sizeof(bar_quote));
   encounter_on_bar_entry(game);
   while (running) {
     draw_base_frame(
-        game, "[R]oom [F]ence R[u]mors [B]rawl Black[j]ack R[o]ulette [Esc]");
+        game, "[R]oom [F]ence R[u]mors S[t]ash [B]rawl Black[j]ack R[o]ulette [Esc]");
     mvprintw(2, 2, "Bar");
     mvprintw(3, 2, "Services:");
     draw_wrapped_text(bar_options, 4, LEFT_TEXT_X, LEFT_TEXT_WIDTH, 9, 0);
@@ -2641,6 +2645,17 @@ static void bar_menu(game_t *game) {
         game_log(game, "Rumour: %s", rumour);
       } else {
         game_log(game, "The barkeep has no charity rumours left.");
+      }
+      break;
+    case 't':
+    case 'T':
+      if (game->player.credits >= 15) {
+        char stash_rumour[128];
+        game->player.credits -= 15;
+        market_generate_stash_rumour(game, stash_rumour, sizeof(stash_rumour));
+        game_log(game, "Stash tip: %s", stash_rumour);
+      } else {
+        game_log(game, "The barkeep does not share tips for free.");
       }
       break;
     case 'b':

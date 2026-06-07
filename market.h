@@ -15,8 +15,12 @@ bool market_buy(game_t *game, location_id_t location, commodity_id_t commodity, 
 bool market_sell(game_t *game, location_id_t location, commodity_id_t commodity, int quantity);
 int market_buy_price(const game_t *game, location_id_t location, commodity_id_t commodity);
 int market_sell_price(const game_t *game, location_id_t location, commodity_id_t commodity);
-int market_fence_price(commodity_id_t commodity);
+int market_fence_price(location_id_t location, commodity_id_t commodity);
+int market_fence_buy_price(location_id_t location, commodity_id_t commodity);
+bool market_fence_buy(game_t *game, location_id_t location, commodity_id_t commodity, int quantity);
+bool market_fence_sell(game_t *game, location_id_t location, commodity_id_t commodity, int quantity);
 void market_generate_rumour(game_t *game, char *buffer, size_t buffer_size);
+void market_generate_stash_rumour(game_t *game, char *buffer, size_t buffer_size);
 int market_estimate_cargo_value(const game_t *game);
 
 #endif

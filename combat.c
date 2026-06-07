@@ -207,6 +207,22 @@ combat_result_t combat_run(game_t *game, enemy_id_t enemy_id, const char *title)
         game->player.credits += payout;
         game_log(game, "%s is down. You recover %d cr from the scene.", enemy->name, payout);
     }
+
+    if (enemy_id == ENEMY_MUGGER || enemy_id == ENEMY_BANDIT || enemy_id == ENEMY_BANDIT_LEADER) {
+        if (rng_chance(game, 30)) {
+            if (player_add_cargo(&game->player, COMMODITY_STOLEN_GOODS, 1)) {
+                game_log(game, "You find 1 x Stolen Goods among the remains.");
+            }
+        }
+    }
+    if (enemy_id == ENEMY_BANDIT || enemy_id == ENEMY_BANDIT_LEADER) {
+        if (rng_chance(game, 20)) {
+            if (player_add_cargo(&game->player, COMMODITY_NARCOTICS, 1)) {
+                game_log(game, "You find 1 x Narcotics among the remains.");
+            }
+        }
+    }
+
     if (enemy->max_hp > 10) {
         game->player.reputation++;
         game_log(game, "Word of the kill spreads. Reputation +1.");

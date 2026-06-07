@@ -89,6 +89,7 @@ void player_init(player_t *player) {
     player->hp = 10;
     player->max_hp = 10;
     player->credits = 100;
+    player->wanted_level = 0;
     player->location = LOCATION_STARPORT;
     player->weapon = WEAPON_FISTS;
     player->armor = ARMOR_NONE;

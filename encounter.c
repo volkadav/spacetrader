@@ -1,6 +1,8 @@
 /* encounter.c: Travel, wilderness, and bar encounter events and their branching outcomes. */
 #include "encounter.h"
 
+#include <ncurses.h>
+
 #include "combat.h"
 #include "market.h"
 #include "player.h"
@@ -26,24 +28,55 @@ static int contraband_base_value(const player_t *player) {
  */
 static void confiscate_contraband(game_t *game) {
     int base_value = contraband_base_value(&game->player);
-    int fine;
+    int bribe_cost;
+    int ch;
 
     if (base_value <= 0) {
         game_log(game, "A patrol searches your cargo and finds nothing to seize.");
         return;
     }
 
+    bribe_cost = clamp_int(((base_value + 9) / 10) * 10, 100, 100000);
+
+    clear();
+    mvprintw(2, 2, "Road Patrol Encounter");
+    mvprintw(4, 2, "A patrol scans your cargo and detects contraband.");
+    mvprintw(5, 2, "Contraband value: %d cr", base_value);
+    mvprintw(7, 2, "The patrol leader eyes you. \"I could look the other way...\"");
+    mvprintw(9, 2, "Bribe cost: %d cr", bribe_cost);
+    mvprintw(10, 2, "Cash on hand: %d cr", game->player.credits);
+    if (game->player.credits < bribe_cost) {
+        mvprintw(11, 2, "You cannot afford the bribe.");
+    }
+    mvprintw(13, 2, "[Y] Pay bribe (keep goods, no heat)  [N] Refuse (confiscation + fine)");
+    refresh();
+
+    while (1) {
+        ch = getch();
+        if (ch == 'y' || ch == 'Y') {
+            if (game->player.credits < bribe_cost) {
+                break;
+            }
+            game->player.credits -= bribe_cost;
+            game_log(game, "You pay %d cr and the patrol waves you through.", bribe_cost);
+            return;
+        }
+        if (ch == 'n' || ch == 'N') {
+            break;
+        }
+    }
+
     player_remove_cargo(&game->player, COMMODITY_NARCOTICS, player_cargo_quantity(&game->player, COMMODITY_NARCOTICS));
     player_remove_cargo(&game->player, COMMODITY_STOLEN_GOODS, player_cargo_quantity(&game->player, COMMODITY_STOLEN_GOODS));
-    fine = clamp_int(((base_value + 9) / 10) * 10, 100, 100000);
-    if (game->player.credits >= fine) {
-        game->player.credits -= fine;
+    if (game->player.credits >= bribe_cost) {
+        game->player.credits -= bribe_cost;
     } else {
-        fine = game->player.credits;
+        bribe_cost = game->player.credits;
         game->player.credits = 0;
     }
     game->player.reputation--;
-    game_log(game, "Patrol confiscates contraband and fines you %d cr.", fine);
+    game->player.wanted_level = clamp_int(game->player.wanted_level + 1, 0, 5);
+    game_log(game, "Patrol confiscates contraband and fines you %d cr. Wanted +1.", bribe_cost);
 }
 
 /**
@@ -116,35 +149,39 @@ void encounter_on_travel(game_t *game, location_id_t from, location_id_t to) {
         return;
     }
 
-    switch (rng_range(game, 1, 6)) {
-    case 1:
-        confiscate_contraband(game);
-        break;
-    case 2: {
-        char rumour[128];
-        market_generate_rumour(game, rumour, sizeof(rumour));
-        game_log(game, "A travelling merchant swaps gossip: %s", rumour);
-        break;
-    }
-    case 3:
-        combat_run(game, ENEMY_MUGGER, "Road Encounter: Mugger");
-        break;
-    case 4:
-        if (game->player.bandages > 0) {
-            game->player.bandages--;
-            game->player.reputation++;
-            game_log(game, "You patch up a lost traveller. Reputation +1.");
-        } else if (game->player.credits >= 10) {
-            game->player.credits -= 10;
-            game->player.reputation++;
-            game_log(game, "You buy provisions for a stranded traveller. Reputation +1.");
+    {
+        int roll = rng_range(game, 1, 6 + game->player.wanted_level);
+        if (roll <= 1 + game->player.wanted_level) {
+            confiscate_contraband(game);
         } else {
-            game_log(game, "A lost traveller asks for help. You have nothing to spare.");
+            switch (roll - game->player.wanted_level) {
+            case 2: {
+                char rumour[128];
+                market_generate_rumour(game, rumour, sizeof(rumour));
+                game_log(game, "A travelling merchant swaps gossip: %s", rumour);
+                break;
+            }
+            case 3:
+                combat_run(game, ENEMY_MUGGER, "Road Encounter: Mugger");
+                break;
+            case 4:
+                if (game->player.bandages > 0) {
+                    game->player.bandages--;
+                    game->player.reputation++;
+                    game_log(game, "You patch up a lost traveller. Reputation +1.");
+                } else if (game->player.credits >= 10) {
+                    game->player.credits -= 10;
+                    game->player.reputation++;
+                    game_log(game, "You buy provisions for a stranded traveller. Reputation +1.");
+                } else {
+                    game_log(game, "A lost traveller asks for help. You have nothing to spare.");
+                }
+                break;
+            default:
+                game_log(game, "The road offers nothing but dust and distance.");
+                break;
+            }
         }
-        break;
-    default:
-        game_log(game, "The road offers nothing but dust and distance.");
-        break;
     }
 }
 
@@ -159,6 +196,16 @@ void encounter_on_wilderness_turn(game_t *game) {
     if (LOCATIONS[game->player.location].kind != LOCATION_KIND_WILDERNESS) {
         return;
     }
+
+    if (game->stash_rumor_active && game->player.location == game->stash_location && rng_chance(game, 30)) {
+        if (player_add_cargo(&game->player, game->stash_commodity, 1)) {
+            game_log(game, "You find the hidden stash: 1 x %s!", COMMODITIES[game->stash_commodity].name);
+        } else {
+            game_log(game, "You find a hidden stash of %s but lack the cargo room.", COMMODITIES[game->stash_commodity].name);
+        }
+        game->stash_rumor_active = false;
+    }
+
     if (!rng_chance(game, 50)) {
         game_log(game, "The wilderness stays quiet for a while.");
         return;

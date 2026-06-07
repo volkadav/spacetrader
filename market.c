@@ -25,6 +25,29 @@ const commodity_def_t COMMODITIES[NUM_COMMODITIES] = {
     [COMMODITY_STOLEN_GOODS] = {"Stolen Goods", "Illegal", 30, 10, false, false}
 };
 
+static const int FENCE_BUY_MODIFIERS[MAX_LOCATIONS][NUM_COMMODITIES] = {
+    [LOCATION_STARPORT] = {
+        [COMMODITY_NARCOTICS] = 110,
+        [COMMODITY_STOLEN_GOODS] = 80,
+    },
+    [LOCATION_ASHFIELD] = {
+        [COMMODITY_NARCOTICS] = 130,
+        [COMMODITY_STOLEN_GOODS] = 90,
+    },
+    [LOCATION_BROKENHILL] = {
+        [COMMODITY_NARCOTICS] = 130,
+        [COMMODITY_STOLEN_GOODS] = 90,
+    },
+    [LOCATION_MILLHAVEN] = {
+        [COMMODITY_NARCOTICS] = 130,
+        [COMMODITY_STOLEN_GOODS] = 90,
+    },
+    [LOCATION_COLDWATER] = {
+        [COMMODITY_NARCOTICS] = 130,
+        [COMMODITY_STOLEN_GOODS] = 90,
+    }
+};
+
 static const int LOCATION_MODIFIERS[MAX_LOCATIONS][NUM_COMMODITIES] = {
     [LOCATION_STARPORT] = {
         130, 120, 115, 100, 100, 100, 110, 80, 110, 80, 140, 110, 110, 140, 100
@@ -280,8 +303,62 @@ int market_sell_price(const game_t *game, location_id_t location, commodity_id_t
  * Returns:
  *   - int: Computed numeric result for this routine.
  */
-int market_fence_price(commodity_id_t commodity) {
+int market_fence_price(location_id_t location, commodity_id_t commodity) {
+    (void)location;
     return (COMMODITIES[commodity].base_price * 70) / 100;
+}
+
+int market_fence_buy_price(location_id_t location, commodity_id_t commodity) {
+    int modifier = FENCE_BUY_MODIFIERS[location][commodity];
+    if (modifier == 0) {
+        modifier = 100;
+    }
+    return (COMMODITIES[commodity].base_price * modifier) / 100;
+}
+
+bool market_fence_buy(game_t *game, location_id_t location, commodity_id_t commodity, int quantity) {
+    int price = market_fence_buy_price(location, commodity);
+    int total_price = price * quantity;
+
+    if (commodity != COMMODITY_NARCOTICS && commodity != COMMODITY_STOLEN_GOODS) {
+        if (commodity == COMMODITY_ARTIFACTS) {
+            game_log(game, "The fence only buys artifacts, not sells them.");
+        } else {
+            game_log(game, "The fence does not deal in %s.", COMMODITIES[commodity].name);
+        }
+        return false;
+    }
+    if (game->player.credits < total_price) {
+        game_log(game, "You cannot afford %s.", COMMODITIES[commodity].name);
+        return false;
+    }
+    if (!player_add_cargo(&game->player, commodity, quantity)) {
+        game_log(game, "Not enough cargo space.");
+        return false;
+    }
+
+    game->player.credits -= total_price;
+    game_log(game, "Bought %d x %s from the fence for %d cr.", quantity, COMMODITIES[commodity].name, total_price);
+    return true;
+}
+
+bool market_fence_sell(game_t *game, location_id_t location, commodity_id_t commodity, int quantity) {
+    int price = market_fence_price(location, commodity);
+    int total_price = price * quantity;
+
+    if (commodity != COMMODITY_NARCOTICS && commodity != COMMODITY_STOLEN_GOODS &&
+        commodity != COMMODITY_ARTIFACTS) {
+        game_log(game, "The fence does not deal in %s.", COMMODITIES[commodity].name);
+        return false;
+    }
+    if (!player_remove_cargo(&game->player, commodity, quantity)) {
+        game_log(game, "You do not have enough %s.", COMMODITIES[commodity].name);
+        return false;
+    }
+
+    game->player.credits += total_price;
+    game_log(game, "Fenced %d x %s for %d cr.", quantity, COMMODITIES[commodity].name, total_price);
+    return true;
 }
 
 /**
@@ -406,6 +483,27 @@ void market_generate_rumour(game_t *game, char *buffer, size_t buffer_size) {
  * Returns:
  *   - int: Computed numeric result for this routine.
  */
+void market_generate_stash_rumour(game_t *game, char *buffer, size_t buffer_size) {
+    static const location_id_t wilds[] = {
+        LOCATION_DUSTWALLOW, LOCATION_IRONPASS, LOCATION_SALTMARSH, LOCATION_BARRENS
+    };
+    commodity_id_t commodity;
+
+    game->stash_location = wilds[rng_range(game, 0, 3)];
+    if (rng_chance(game, 50)) {
+        game->stash_commodity = COMMODITY_NARCOTICS;
+        commodity = COMMODITY_NARCOTICS;
+    } else {
+        game->stash_commodity = COMMODITY_STOLEN_GOODS;
+        commodity = COMMODITY_STOLEN_GOODS;
+    }
+    game->stash_rumor_active = true;
+
+    snprintf(buffer, buffer_size,
+             "A hidden cache of %s is stashed somewhere in %s. Worth a look.",
+             COMMODITIES[commodity].name, LOCATIONS[game->stash_location].name);
+}
+
 int market_estimate_cargo_value(const game_t *game) {
     int total = 0;
 
