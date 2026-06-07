@@ -1090,7 +1090,7 @@ static int draw_location_view(const game_t *game, int description_scroll) {
 
   if (location->kind == LOCATION_KIND_WILDERNESS) {
     snprintf(commands, sizeof(commands),
-             "[1-4]Travel [P]rospect [R]est [I]nventory%s [V]Save [Q]uit",
+             "[1-4]Travel [P]rospect [R]est [B]andage [M]edkit [I]nventory%s [V]Save [Q]uit",
              ground_option);
   } else if (game->player.location == LOCATION_STARPORT) {
     snprintf(commands, sizeof(commands),
@@ -3149,6 +3149,8 @@ static void location_loop(game_t *game) {
   case 'M':
     if (game->player.location == LOCATION_STARPORT) {
       trade_hub_menu(game);
+    } else if (LOCATIONS[game->player.location].kind == LOCATION_KIND_WILDERNESS) {
+      player_use_medkit(game);
     }
     break;
   case 's':
@@ -3160,7 +3162,9 @@ static void location_loop(game_t *game) {
     break;
   case 'b':
   case 'B':
-    if (LOCATIONS[game->player.location].kind != LOCATION_KIND_WILDERNESS) {
+    if (LOCATIONS[game->player.location].kind == LOCATION_KIND_WILDERNESS) {
+      player_use_bandage(game);
+    } else {
       bar_menu(game);
     }
     break;

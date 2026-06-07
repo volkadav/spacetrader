@@ -2,6 +2,6 @@
 #ifndef SPACE_TRADER_VERSION_H
 #define SPACE_TRADER_VERSION_H
 
-#define SPACE_TRADER_VERSION "0.4.1-beta"
+#define SPACE_TRADER_VERSION "0.4.2-beta"
 
 #endif
